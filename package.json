@@ -1,0 +1,29 @@
+{
+  "name": "trooba-grpc-transport",
+  "version": "1.0.0",
+  "description": "gRPC transport for trooba pipeline",
+  "main": "index.js",
+  "directories": {
+    "test": "test"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/dimichgh/trooba-grpc-transport.git"
+  },
+  "keywords": [
+    "grpc",
+    "service",
+    "trooba",
+    "transport",
+    "pipeline"
+  ],
+  "author": "Dmytro Semenov <dimichsdg@yahoo.com>",
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/dimichgh/trooba-grpc-transport/issues"
+  },
+  "homepage": "https://github.com/dimichgh/trooba-grpc-transport#readme"
+}
