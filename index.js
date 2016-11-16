@@ -13,42 +13,49 @@ module.exports = function grpcFactory(config) {
         proto = Grpc.load(proto);
     }
 
-    var service = extractService(proto, config.serviceName);
-
+    var serviceMethods = extractService(proto, config.serviceName);
     // find a client and setup connection and error handling
     var endpoint = config.hostname + ':' + config.port;
 
     var client = connections[endpoint] = connections[endpoint] ||
-        new proto[service](endpoint, config.credentials ||  Grpc.credentials.createInsecure());
+        new proto[config.serviceName](endpoint, config.credentials ||  Grpc.credentials.createInsecure());
 
     // TODO: handle error case when service is disconnected
     // * remove it from the list and let it re-connect inside grpc section below
 
     function grpcTransport(requestContext, responseContext) {
-        var message = requestContext.message;
+        var message = requestContext.request;
         var operation = requestContext.operation;
         client[operation](message, function onResponse(err, response) {
-            if (response) {
-                responseContext.message = response.message;
-                responseContext.status = response.status;
-            }
-            responseContext.next(err);
+            responseContext.next(err, response);
         });
     }
 
     // TODO:
     //  * handle stream API
 
-    grpcTransport.api = function api(requestContext, responseContext) {
-        return Object.keys(service).reduce(function reduce(memo, methodName) {
-            memo[methodName] = function apiMethod(message, callback) {
-                requestContext.message = message;
-                requestContext.next(function onResponse() {
-                    callback(responseContext.error, responseContext.message);
+    grpcTransport.api = function api(pipe) {
+
+        function genericRequest(operation, request, callback) {
+            return pipe(function ctx(requestContext, responseContext) {
+                requestContext.operation = operation;
+                requestContext.request = request;
+                requestContext.next(function onResponse(err, response) {
+                    callback(err, response && response.message);
                 });
-            };
+            });
+        }
+
+        var client = serviceMethods.reduce(function reduce(memo, methodName) {
+            methodName = methodName.charAt(0).toLowerCase() + methodName.slice(1);
+            memo[methodName] = memo.request$.bind(memo, methodName);
             return memo;
-        }, {});
+        }, {
+            // generic API
+            request$: genericRequest
+        });
+
+        return client;
     };
 
     return grpcTransport;
@@ -74,6 +81,7 @@ function extractService(proto, serviceName) {
     else {
         service = services[Object.keys(services)[0]];
     }
+
     return service;
 }
 
