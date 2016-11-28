@@ -3,7 +3,6 @@
 var Grpc = require('grpc');
 var hello_proto = Grpc.load(require.resolve('./hello.proto'));
 
-console.log(hello_proto.Hello.service.children[0].requestStream)
 /**
  * Implements the SayHello RPC method.
  */
