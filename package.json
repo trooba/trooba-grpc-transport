@@ -1,6 +1,6 @@
 {
   "name": "trooba-grpc-transport",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "description": "gRPC transport for trooba pipeline",
   "main": "index.js",
   "directories": {

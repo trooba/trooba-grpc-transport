@@ -5,7 +5,9 @@ option java_package = "com.app.sample.grpc";
 // The hello service definition.
 service Hello {
     // Sends a greeting
-    rpc SayHello ( HelloRequest) returns (  HelloReply) {}
+    rpc SayHello (stream HelloRequest) returns (  HelloReply) {}
+    rpc BeGreeted (HelloRequest) returns (stream HelloReply) {}
+    rpc SayHelloAll (stream HelloRequest) returns (stream HelloReply) {}
 }
 
 // The request message containing the user's name.

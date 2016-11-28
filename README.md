@@ -33,7 +33,7 @@ require('trooba')
 ```js
 syntax = "proto3";
 
-option java_package = "com.ebay.app.sample.grpc";
+option java_package = "com.app.sample.grpc";
 
 // The hello service definition.
 service Hello {
