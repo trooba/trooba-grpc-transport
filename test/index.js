@@ -32,13 +32,13 @@ describe(__filename, function () {
         });
     });
 
-    it.skip('should do ssl', function (done) {
+    it('should do ssl', function (done) {
         var Server = require('./fixtures/hello/server');
 
-        server = Server.startSsl(50001);
+        server = Server.startSsl(50006);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50001,
+            port: 50006,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello',

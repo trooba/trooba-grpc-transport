@@ -33,7 +33,7 @@ module.exports.startSsl = function start(port) {
             private_key: Fs.readFileSync(require.resolve('./certs/server.key')),
             cert_chain: Fs.readFileSync(require.resolve('./certs/server.crt'))
         }],
-        true
+        false
     ));
     server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
     server.start();
