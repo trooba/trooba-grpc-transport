@@ -17,10 +17,20 @@ function sayHello(call, callback) {
 }
 
 function beGreeted(call, callback) {
+    if (call.request.name === 'timeout') {
+        return;
+    }
     var reply = 'Hello ' + call.request.name;
-    ['Bob', 'John'].map(function map(name) {
-        call.write(reply + ' from ' + name);
-    });
+    var array = ['Bob', 'John'];
+    for (var i = 0; i < array.length; i++) {
+        if (i > 0 && call.request.name === 'timeout-after-first-chunk') {
+            return;
+        }
+        call.write(reply + ' from ' + array[i]);
+    }
+    if (call.request.name === 'no-end') {
+        return;
+    }
     call.end();
 }
 
@@ -28,7 +38,7 @@ function sayHelloAll(call, callback) {
     call.on('data', function onData(message) {
         call.write('Hello ' + message.name);
     });
-    call.end(function onEnd() {
+    call.on('end', function () {
         call.end();
     });
 }

@@ -20,7 +20,9 @@ require('trooba')
         protocol: 'http:',
         hostname: 'grpc.service.my',
         port: 50001,
-        proto: require.resolve('path/to/hello.proto')
+        proto: require.resolve('path/to/hello.proto'),
+        connectTimeout: 100,
+        socketTimeout: 1000
     })
     .create()
     .hello('Bob', function (err, response) {

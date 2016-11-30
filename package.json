@@ -32,6 +32,7 @@
     "trooba": "^0"
   },
   "dependencies": {
-    "grpc": "^1.0.1"
+    "grpc": "^1.0.1",
+    "hoek": "^2.16.3"
   }
 }

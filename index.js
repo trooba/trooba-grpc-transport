@@ -2,12 +2,12 @@
 
 var NodeUtils = require('util');
 var Grpc = require('grpc');
+var Hoek = require('hoek');
 
 var connections = {};
 
 function debug() {
-    // module.exports.debug.apply(null, arguments);
-    console.log.apply(console, arguments);
+    module.exports.debug.apply(null, arguments);
 }
 /**
  * Defines gRPC transport
@@ -49,13 +49,29 @@ module.exports = function grpcFactory(config) {
             args.push(request.options);
         }
         if (!operationMeta.responseStream) {
-            args.push(reply);
+            reply = Hoek.once(reply);
+            setTimeout(function readTimeout() {
+                var err = new Error('Response timeout ' + endpoint + ', operation ' + request.operation);
+                err.code = 'ETIMEDOUT';
+                err.type = 'ESOCKTIMEDOUT';
+                reply(err);
+            }, config.socketTimeout || 1000);
+
+            args.push(process.domain ? process.domain.bind(reply) : reply);
         }
 
         debug('# waiting for client', endpoint);
-        Grpc.waitForClientReady(client, Infinity, function (err) {
+
+        var waitForClientReady = process.domain ? process.domain.bind(waitForConnect) : waitForConnect;
+
+        Grpc.waitForClientReady(client,
+            Date.now() + (config.connectTimeout || 1000),
+            waitForClientReady);
+
+        function waitForConnect(err) {
             debug('# done waiting for client', endpoint);
             if (err) {
+                err.code = 'ETIMEDOUT';
                 debug('# got error while connecting', endpoint, err);
                 return reply(err);
             }
@@ -64,26 +80,34 @@ module.exports = function grpcFactory(config) {
 
             if (operationMeta.requestStream || operationMeta.responseStream) {
                 debug('# detected streaming API request stream %s, response stream %s',
-                    operationMeta.requestStream, operationMeta.responseStrea);
+                    operationMeta.requestStream, operationMeta.responseStream);
                 requestContext.connection.resolve(call);
             }
 
             if (operationMeta.responseStream) {
+                // make sure domain context is propagated
+
+                // process.domain ? process.domain.add(call) : call;
+                var onceReply = Hoek.once(reply);
+
                 call.on('data', reply.bind(null, null));
-                call.once('end', reply);
-                call.once('error', reply);
-                call.on('error', function cleanup(err) {
-                    if (cleanup.done) {
-                        return;
-                    }
-                    cleanup.done = true;
+                call.once('end', onceReply);
+                call.once('error', onceReply);
+                call.on('error', Hoek.once(function cleanup(err) {
                     debug('# error', err);
                     call.removeListener('data', reply);
                     call.removeListener('end', reply);
                     call.removeListener('data', reply);
-                });
+                }));
+
+                setTimeout(function readTimeout() {
+                    var err = new Error('Response timeout ' + endpoint + ', operation ' + request.operation);
+                    err.code = 'ETIMEDOUT';
+                    err.type = 'ESOCKTIMEDOUT';
+                    call.emit('error', err);
+                }, config.socketTimeout || 1000);
             }
-        });
+        }
 
     }
 
@@ -221,4 +245,7 @@ module.exports.Utils = {
     extractService: extractService
 };
 
-module.exports.debug = function noop() {};
+module.exports.debug = process &&
+    process.env &&
+    process.env.DEBUG &&
+    process.env.DEBUG.indexOf('trooba-grpc-transport') !== -1 ? console.log : function noop() {};
