@@ -87,7 +87,6 @@ module.exports = function grpcFactory(config) {
             if (operationMeta.responseStream) {
                 // make sure domain context is propagated
 
-                // process.domain ? process.domain.add(call) : call;
                 var onceReply = Hoek.once(reply);
 
                 call.on('data', reply.bind(null, null));
