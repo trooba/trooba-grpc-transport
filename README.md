@@ -23,7 +23,7 @@ require('trooba')
         proto: require.resolve('path/to/hello.proto')
     })
     .create()
-    .hello('Bib', function (err, response) {
+    .hello('Bob', function (err, response) {
         console.log(err, response)
     });
 ```
