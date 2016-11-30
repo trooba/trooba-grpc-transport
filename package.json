@@ -29,7 +29,7 @@
   "devDependencies": {
     "async": "^2.1.2",
     "mocha": "^3.1.2",
-    "trooba": "file:../trooba"
+    "trooba": "^0"
   },
   "dependencies": {
     "grpc": "^1.0.1"
