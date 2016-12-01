@@ -26,11 +26,21 @@ function beGreeted(call, callback) {
         if (i > 0 && call.request.name === 'timeout-after-first-chunk') {
             return;
         }
-        call.write(reply + ' from ' + array[i]);
+        if (call.request.name === 'slow') {
+            setTimeout(call.write.bind(call, reply + ' from ' + array[i]), 100 * (i + 1));
+        }
+        else {
+            call.write(reply + ' from ' + array[i]);
+        }
     }
     if (call.request.name === 'no-end') {
         return;
     }
+    if (call.request.name === 'slow') {
+        setTimeout(call.end.bind(call), 100 * (i + 1));
+        return;
+    }
+
     call.end();
 }
 

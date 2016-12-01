@@ -9,6 +9,7 @@ var grpcTransport = require('..');
 describe(__filename, function () {
 
     var server;
+    var portCounter = 50000;
 
     afterEach(function () {
         server && server.forceShutdown();
@@ -17,10 +18,11 @@ describe(__filename, function () {
     it('should expose proto API', function (done) {
         var Server = require('./fixtures/hello/server');
 
-        server = Server.start(50001);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50001,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -36,10 +38,11 @@ describe(__filename, function () {
     it('should do ssl', function (done) {
         var Server = require('./fixtures/hello/server');
 
-        server = Server.startSsl(50006);
+        var port = portCounter++;
+        server = Server.startSsl(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50006,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello',
@@ -81,10 +84,11 @@ describe(__filename, function () {
     it('should expose proto API with multiple methods, serial', function (done) {
         var Server = require('./fixtures/multi-hello/server');
 
-        server = Server.start(50002);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50002,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -116,10 +120,11 @@ describe(__filename, function () {
     it('should expose proto API with multiple methods, parallel', function (done) {
         var Server = require('./fixtures/multi-hello/server');
 
-        server = Server.start(50002);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50002,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -151,10 +156,11 @@ describe(__filename, function () {
     it('should expose proto with streaming request API', function (done) {
         var Server = require('./fixtures/hello-streaming/server');
 
-        server = Server.start(50004);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50004,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -176,10 +182,11 @@ describe(__filename, function () {
     it('should expose proto with streaming response API', function (done) {
         var Server = require('./fixtures/hello-streaming/server');
 
-        server = Server.start(50005);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50005,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -206,10 +213,11 @@ describe(__filename, function () {
     it('stream/stream, should expose streaming API', function (done) {
         var Server = require('./fixtures/hello-streaming/server');
 
-        server = Server.start(50007);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50007,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -242,10 +250,11 @@ describe(__filename, function () {
 
     it('should expose proto API with multiple services', function (done) {
         var Server = require('./fixtures/multi-hello/server');
-        server = Server.start(50001);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50001,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -260,10 +269,11 @@ describe(__filename, function () {
 
     it('should invoke grpc operation', function (done) {
         var Server = require('./fixtures/multi-hello/server');
-        server = Server.start(50001);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50001,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -280,10 +290,11 @@ describe(__filename, function () {
 
     it('should keep context with request/response', function (done) {
         var Server = require('./fixtures/multi-hello/server');
-        server = Server.start(50001);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50001,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -308,10 +319,11 @@ describe(__filename, function () {
 
         var Server = require('./fixtures/hello-streaming/server');
 
-        server = Server.start(50015);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50015,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -346,10 +358,11 @@ describe(__filename, function () {
 
     it('should keep context when connect error happens', function (done) {
         var Server = require('./fixtures/hello-timeout/server');
-        server = Server.start(50001);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50001,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello',
@@ -372,16 +385,14 @@ describe(__filename, function () {
         });
     });
 
-    it.skip('should keep context when response error happens', function (done) {
-    });
+    it('should keep context when response timeout error happens', function (done) {
+        var Server = require('./fixtures/hello-timeout/server');
 
-    it.skip('should keep context when response stream error happens', function (done) {
-        var Server = require('./fixtures/hello-streaming/server');
-
-        server = Server.start(50015);
+        var port = portCounter++;
+        server = Server.start(port);
 
         var client = Trooba.transport(grpcTransport, {
-            port: 50015,
+            port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
@@ -391,23 +402,53 @@ describe(__filename, function () {
         domain.run(function () {
             process.domain.foo = 'bar';
 
-            client.beGreeted('timeout', function (err, response) {
-                // getting reponse
-                Assert.ok(!err, err && err.stack);
+            client.request$({
+                name: 'sayHello'
+            }, 'John', function (err, response) {
+                Assert.ok(err);
+                Assert.equal('ETIMEDOUT', err.code);
+                Assert.equal('ESOCKTIMEDOUT', err.type);
                 Assert.equal('bar', process.domain.foo);
                 done();
             });
+        });
 
+    });
+
+    it('should keep context when response stream error happens', function (done) {
+        var Server = require('./fixtures/hello-streaming/server');
+
+        var port = portCounter++;
+        server = Server.start(port);
+
+        var client = Trooba.transport(grpcTransport, {
+            port: port,
+            hostname: 'localhost',
+            proto: Server.proto,
+            serviceName: 'Hello'
+        }).create();
+
+        var domain = Domain.create();
+        domain.run(function () {
+            process.domain.foo = 'bar';
+            client.beGreeted('timeout', function (err, response) {
+                Assert.ok(err);
+                Assert.equal('bar', process.domain.foo);
+                Assert.equal('ETIMEDOUT', err.code);
+                Assert.equal('ESOCKTIMEDOUT', err.type);
+                done();
+            });
         });
     });
 
     describe('negative', function () {
         it('should handle connect timeout, request/response', function (done) {
             var Server = require('./fixtures/hello-timeout/server');
-            server = Server.start(50001);
+            var port = portCounter++;
+            server = Server.start(port);
 
             var client = Trooba.transport(grpcTransport, {
-                port: 50001,
+                port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello',
@@ -425,10 +466,11 @@ describe(__filename, function () {
 
         it('should handle socket/read timeout, request/response', function (done) {
             var Server = require('./fixtures/hello-timeout/server');
-            server = Server.start(50001);
+            var port = portCounter++;
+            server = Server.start(port);
 
             var client = Trooba.transport(grpcTransport, {
-                port: 50001,
+                port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello',
@@ -446,10 +488,11 @@ describe(__filename, function () {
 
         it('should handle bad hostname', function (done) {
             var Server = require('./fixtures/hello/server');
-            server = Server.start(50001);
+            var port = portCounter++;
+            server = Server.start(port);
 
             var client = Trooba.transport(grpcTransport, {
-                port: 50001,
+                port: port,
                 hostname: 'bad-host',
                 proto: Server.proto,
                 serviceName: 'Hello',
@@ -475,10 +518,11 @@ describe(__filename, function () {
 
             var Server = require('./fixtures/hello-streaming/server');
 
-            server = Server.start(50015);
+            var port = portCounter++;
+            server = Server.start(port);
 
             var client = Trooba.transport(grpcTransport, {
-                port: 50015,
+                port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello'
@@ -496,18 +540,20 @@ describe(__filename, function () {
 
             var Server = require('./fixtures/hello-streaming/server');
 
-            server = Server.start(50015);
+            var port = 100 + portCounter++;
+            server = Server.start(port);
 
             var client = Trooba.transport(grpcTransport, {
-                port: 50015,
+                port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
-                serviceName: 'Hello'
+                serviceName: 'Hello',
+                socketTimeout: 100
             }).create();
 
             var counter = 0;
 
-            client.beGreeted('timeout-after-first-chunk', function (err, response) {
+            client.beGreeted('timeout-after-first-chunk', function onGreetResponse(err, response) {
                 if (counter++ === 0) {
                     Assert.equal('Hello timeout-after-first-chunk from Bob', response);
                 }
@@ -524,10 +570,11 @@ describe(__filename, function () {
 
             var Server = require('./fixtures/hello-streaming/server');
 
-            server = Server.start(50015);
+            var port = portCounter++;
+            server = Server.start(port);
 
             var client = Trooba.transport(grpcTransport, {
-                port: 50015,
+                port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello'
@@ -550,8 +597,53 @@ describe(__filename, function () {
             });
         });
 
-        it.skip('should handle error in stream/stream flow', function (done) {
+        it('should re-set response timeout after each received chunk', function (done) {
+            var Server = require('./fixtures/hello-streaming/server');
+
+            var port = portCounter++;
+            server = Server.start(port);
+
+            var client = Trooba.transport(grpcTransport, {
+                port: port,
+                hostname: 'localhost',
+                proto: Server.proto,
+                serviceName: 'Hello',
+                socketTimeout: 130
+            }).create();
+
+            var messageCount = 0;
+
+            client.beGreeted('slow', function (err, response) {
+                // getting reponse
+                Assert.ok(!err, err && err.stack);
+                if (err === undefined && response === undefined) {
+                    // reached the end
+                    Assert.equal(2, messageCount);
+                    done();
+                }
+                messageCount++;
+                Assert.ok([
+                    'Hello slow from John',
+                    'Hello slow from Bob'
+                ].indexOf(response) !== -1);
+            });
         });
+
+        it.skip('should handle diconnect while waitng for response', function (done) {
+        });
+
+        it.skip('should handle diconnect while waitng for response stream', function (done) {
+        });
+
+        it.skip('should handle diconnect while sending request', function (done) {
+        });
+
+        it.skip('should handle diconnect while writing into request stream', function (done) {
+        });
+
+        it.skip('should handle re-connect', function (done) {
+        });
+
     });
 
     describe('parallel', function () {

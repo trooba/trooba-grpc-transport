@@ -13,6 +13,7 @@ function debug() {
  * Defines gRPC transport
 */
 module.exports = function grpcFactory(config) {
+    console.log('# grpc factory init');
     var proto = config.proto;
     if (typeof proto === 'string') {
         proto = Grpc.load(proto);
@@ -23,15 +24,13 @@ module.exports = function grpcFactory(config) {
     // find a client and setup connection and error handling
     var endpoint = config.hostname + ':' + config.port;
 
-    debug('# connect: ', endpoint, config.credentials);
+    debug('# connect: ', endpoint, config.credentials || '');
     var client = connections[endpoint] = connections[endpoint] ||
         new proto[config.serviceName](endpoint, config.credentials ||  Grpc.credentials.createInsecure(), config.options);
 
-    // TODO: handle error case when service is disconnected
-    // * remove it from the list and let it re-connect inside grpc section below
-
     function grpcTransport(requestContext, reply) {
         debug('# request context', requestContext);
+        var readTimeout;
         var request = requestContext.request;
         // handle string operation name and operation attributes
         var operationMeta = typeof request.operation === 'string' ? {
@@ -48,19 +47,8 @@ module.exports = function grpcFactory(config) {
         if (request.options) {
             args.push(request.options);
         }
-        if (!operationMeta.responseStream) {
-            reply = Hoek.once(reply);
-            setTimeout(function readTimeout() {
-                var err = new Error('Response timeout ' + endpoint + ', operation ' + request.operation);
-                err.code = 'ETIMEDOUT';
-                err.type = 'ESOCKTIMEDOUT';
-                reply(err);
-            }, config.socketTimeout || 1000);
 
-            args.push(process.domain ? process.domain.bind(reply) : reply);
-        }
-
-        debug('# waiting for client', endpoint);
+        debug('# waiting for connection', endpoint);
 
         var waitForClientReady = process.domain ? process.domain.bind(waitForConnect) : waitForConnect;
 
@@ -69,14 +57,34 @@ module.exports = function grpcFactory(config) {
             waitForClientReady);
 
         function waitForConnect(err) {
-            debug('# done waiting for client', endpoint);
+            debug('# done waiting for connection', endpoint);
+            var call;
+            var timedReply = function timedReply(err, response) {
+                if (readTimeout) {
+                    clearTimeout(readTimeout);
+                    readTimeout = undefined;
+                }
+                if (operationMeta.responseStream && response) {
+                    // set new response timeout for the next chunk if not the end of stream
+                    debug('# setting up timeout for the next chunk');
+                    setupReadTimeout(call);
+                }
+                reply.apply(null, arguments);
+            };
+            if (!operationMeta.responseStream) {
+                timedReply = Hoek.once(timedReply);
+                setupReadTimeout();
+
+                args.push(process.domain ? process.domain.bind(timedReply) : timedReply);
+            }
+
             if (err) {
                 err.code = 'ETIMEDOUT';
                 debug('# got error while connecting', endpoint, err);
-                return reply(err);
+                return timedReply(err);
             }
             debug('# calling', operationMeta.name);
-            var call = client[operationMeta.name].apply(client, args);
+            call = client[operationMeta.name].apply(client, args);
 
             if (operationMeta.requestStream || operationMeta.responseStream) {
                 debug('# detected streaming API request stream %s, response stream %s',
@@ -85,26 +93,40 @@ module.exports = function grpcFactory(config) {
             }
 
             if (operationMeta.responseStream) {
-                // make sure domain context is propagated
+                var onceReply = Hoek.once(timedReply);
 
-                var onceReply = Hoek.once(reply);
-
-                call.on('data', reply.bind(null, null));
+                call.on('data', timedReply.bind(null, null));
                 call.once('end', onceReply);
                 call.once('error', onceReply);
                 call.on('error', Hoek.once(function cleanup(err) {
                     debug('# error', err);
-                    call.removeListener('data', reply);
-                    call.removeListener('end', reply);
-                    call.removeListener('data', reply);
+                    call.removeListener('data', timedReply);
+                    call.removeListener('end', onceReply);
+                    call.removeListener('data', onceReply);
                 }));
 
-                setTimeout(function readTimeout() {
-                    var err = new Error('Response timeout ' + endpoint + ', operation ' + request.operation);
+                setupReadTimeout(call);
+            }
+
+            function setupReadTimeout(emitter) {
+                if (readTimeout) {
+                    debug('# clearing current response timeout');
+                    clearTimeout(readTimeout);
+                }
+                var responseTimeout = config.socketTimeout || 1000;
+                debug('# setting up response timeout', responseTimeout);
+
+                readTimeout = setTimeout(function _readTimeout() {
+                    var err = new Error('Response timeout ' + endpoint + ', operation ' + request.operation.name);
                     err.code = 'ETIMEDOUT';
                     err.type = 'ESOCKTIMEDOUT';
-                    call.emit('error', err);
-                }, config.socketTimeout || 1000);
+                    if (emitter) {
+                        emitter.emit('error', err);
+                    }
+                    else {
+                        timedReply(err);
+                    }
+                }, responseTimeout);
             }
         }
 
