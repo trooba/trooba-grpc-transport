@@ -30,7 +30,7 @@ require('trooba')
     });
 ```
 
-#### hello.proto definition:
+#### Sample proto definition:
 
 ```js
 syntax = "proto3";

@@ -171,7 +171,7 @@ describe(__filename, function () {
             Assert.ok(!err, err && err.stack);
             Assert.equal('Hello John and Bob', response);
             done();
-        }).connection.on(function (call) {
+        }).on('connection', function (call) {
             // sending request
             call.write('John');
             call.write('Bob');
@@ -239,7 +239,7 @@ describe(__filename, function () {
                 'Hello John',
                 'Hello Bob'
             ].indexOf(response) !== -1);
-        }).connection.on(function (call) {
+        }).on('connection', function (call) {
             // sending request
             call.write('John');
             call.write('Bob');

@@ -1,5 +1,6 @@
 'use strict';
 
+var EventEmitter = require('events').EventEmitter;
 var NodeUtils = require('util');
 var Grpc = require('grpc');
 var Hoek = require('hoek');
@@ -89,7 +90,7 @@ module.exports = function grpcFactory(config) {
             if (operationMeta.requestStream || operationMeta.responseStream) {
                 debug('# detected streaming API request stream %s, response stream %s',
                     operationMeta.requestStream, operationMeta.responseStream);
-                requestContext.connection.resolve(call);
+                requestContext.emit('connection', call);
             }
 
             if (operationMeta.responseStream) {
@@ -142,23 +143,20 @@ module.exports = function grpcFactory(config) {
 
             debug('# pipe for', operationMeta.name, message);
 
-            var requestContext = pipe(function ctx(requestContext, next) {
-                requestContext.request = {
-                    message: message,
-                    operation: operationMeta
-                };
+            var requestContext = new EventEmitter();
+            requestContext.request = {
+                message: message,
+                operation: operationMeta
+            };
 
-                addConnection(requestContext);
-
-                next(function onResponseContext(responseContext) {
-                    debug('# got response context', responseContext);
-                    if (responseContext === undefined) {
-                        // detected end of stream
-                        return callback();
-                    }
-                    callback(responseContext.error,
-                        responseContext.response && responseContext.response.message);
-                });
+            pipe(requestContext, function onResponse(responseContext) {
+                debug('# got response context', responseContext);
+                if (responseContext === undefined) {
+                    // detected end of stream
+                    return callback();
+                }
+                callback(responseContext.error,
+                    responseContext.response && responseContext.response.message);
             });
 
             return requestContext;
@@ -179,33 +177,6 @@ module.exports = function grpcFactory(config) {
 
     return grpcTransport;
 };
-
-function addConnection(requestContext) {
-    requestContext.connection = {
-        MAX_LISTENERS: 10,
-        listeners: [],
-        resolve: function resolve(call) {
-            this.call = call;
-            this.listeners.forEach(function forEach(listener) {
-                listener(call);
-            });
-            // clean
-            this.listeners = [];
-        },
-        on: function on(listener) {
-            if (this.call) {
-                return listener(this.call);
-            }
-
-            debug('# waiting for connection');
-            this.listeners = this.listeners;
-            this.listeners.push(listener);
-            if (this.listeners.length > this.MAX_LISTENERS) {
-                    console.trace('Possible memory leak: Max number of listeners has been reached for the given connection, increase the limit by setting requestContext.connection.MAX_LISTENERS = {limit}');
-                }
-        }
-    };
-}
 
 function extractService(proto, serviceName) {
     var services = selectServices(proto);
