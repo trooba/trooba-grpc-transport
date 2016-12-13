@@ -21,12 +21,12 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         client.sayHello('John', function (err, response) {
             Assert.ok(!err, err && err.stack);
@@ -41,13 +41,13 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.startSsl(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello',
             credentials: Server.clientCredentials
-        }).create();
+        }).build('client:default');
 
         client.sayHello('John', function (err, response) {
             Assert.ok(!err, err && err.stack);
@@ -60,7 +60,7 @@ describe(__filename, function () {
         this.timeout(10000);
         var Server = require('./fixtures/hello/server');
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: 6565,
             hostname: 'localhost',
             proto: Server.proto,
@@ -70,7 +70,7 @@ describe(__filename, function () {
                 'grpc.ssl_target_name_override': 'localhost',
                 'grpc.default_authority': 'localhost'
             }
-        }).create();
+        }).build('client:default');
 
         client.sayHello('John', function (err, response) {
             console.log(err, response)
@@ -87,12 +87,12 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         Async.series({
             hello: function (next) {
@@ -123,12 +123,12 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         Async.parallel({
             hello: function (next) {
@@ -159,24 +159,28 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build({
+            // trace: true,
+            // tracer$: function (message, point) {
+            //     console.log('*** trace: ', point._id , point.handler.name, message.type, message.context.$points)
+            // }
+        }, 'client:default');
 
-        client.sayHello(function (err, response) {
+        var call = client.sayHello(function (err, response) {
             // getting reponse
             Assert.ok(!err, err && err.stack);
             Assert.equal('Hello John and Bob', response);
             done();
-        }).on('connection', function (call) {
-            // sending request
-            call.write('John');
-            call.write('Bob');
-            call.end();
         });
+
+        call.write('John');
+        call.write('Bob');
+        call.end();
     });
 
     it('should expose proto with streaming response API', function (done) {
@@ -185,29 +189,29 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         var messageCount = 0;
 
-        client.beGreeted('Jack', function (err, response) {
-            // getting reponse
-            Assert.ok(!err, err && err.stack);
-            if (err === undefined && response === undefined) {
-                // reached the end
-                Assert.equal(2, messageCount);
-                done();
-            }
+        var call = client.beGreeted('Jack');
+        call.on('data', function (data) {
             messageCount++;
             Assert.ok([
                 'Hello Jack from John',
                 'Hello Jack from Bob'
-            ].indexOf(response) !== -1);
-        });
+            ].indexOf(data) !== -1);
+        })
+        .on('end', function () {
+            // reached the end
+            Assert.equal(2, messageCount);
+            done();
+        })
+        .on('error', done);
     });
 
     it('stream/stream, should expose streaming API', function (done) {
@@ -216,36 +220,31 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         var messageCount = 0;
 
-        client.sayHelloAll(function (err, response) {
-            // getting reponse
-            // getting reponse
-            Assert.ok(!err, err && err.stack);
-            if (err === undefined && response === undefined) {
-                // reached the end
-                Assert.equal(2, messageCount);
-                done();
-            }
+        var call = client.sayHelloAll();
+        call.on('data', function (data) {
             messageCount++;
             Assert.ok([
                 'Hello John',
                 'Hello Bob'
-            ].indexOf(response) !== -1);
-        }).on('connection', function (call) {
-            // sending request
-            call.write('John');
-            call.write('Bob');
-            call.end();
+            ].indexOf(data) !== -1);
+        }).on('end', function () {
+            Assert.equal(2, messageCount);
+            done();
         });
 
+        // sending request
+        call.write('John');
+        call.write('Bob');
+        call.end();
     });
 
     it('should expose proto API with multiple services', function (done) {
@@ -253,12 +252,12 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         client.sayHello('John', function (err, response) {
             Assert.ok(!err, err && err.stack);
@@ -272,12 +271,12 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         client.request$({
             name: 'sayHello'
@@ -293,12 +292,12 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         var domain = Domain.create();
         domain.run(function () {
@@ -322,12 +321,12 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         var domain = Domain.create();
         domain.run(function () {
@@ -335,22 +334,21 @@ describe(__filename, function () {
 
             var messageCount = 0;
 
-            client.beGreeted('Jack', function (err, response) {
-                // getting reponse
-                Assert.ok(!err, err && err.stack);
-                if (err === undefined && response === undefined) {
-                    // reached the end
-                    Assert.equal(2, messageCount);
-                    Assert.equal('bar', process.domain.foo);
-                    done();
-                }
+            client.beGreeted('Jack')
+            .on('data', function (data) {
                 messageCount++;
                 Assert.ok([
                     'Hello Jack from John',
                     'Hello Jack from Bob'
-                ].indexOf(response) !== -1);
+                ].indexOf(data) !== -1);
                 Assert.equal('bar', process.domain.foo);
-            });
+            })
+            .on('end', function () {
+                Assert.equal(2, messageCount);
+                Assert.equal('bar', process.domain.foo);
+                done();
+            })
+            .on('error', done);
 
         });
 
@@ -361,13 +359,13 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello',
             connectTimeout: 1
-        }).create();
+        }).build('client:default');
 
         var domain = Domain.create();
         domain.run(function () {
@@ -391,12 +389,12 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         var domain = Domain.create();
         domain.run(function () {
@@ -421,24 +419,34 @@ describe(__filename, function () {
         var port = portCounter++;
         server = Server.start(port);
 
-        var client = Trooba.transport(grpcTransport, {
+        var client = Trooba.use(grpcTransport, {
             port: port,
             hostname: 'localhost',
             proto: Server.proto,
             serviceName: 'Hello'
-        }).create();
+        }).build('client:default');
 
         var domain = Domain.create();
         domain.run(function () {
             process.domain.foo = 'bar';
-            client.beGreeted('timeout', function (err, response) {
+            client.beGreeted('timeout')
+            .on('error', function (err) {
                 Assert.ok(err);
                 Assert.equal('bar', process.domain.foo);
                 Assert.equal('ETIMEDOUT', err.code);
                 Assert.equal('ESOCKTIMEDOUT', err.type);
                 done();
+            })
+            .on('data', function () {
+                done(new Error('Should not happen'));
             });
         });
+    });
+
+    it.skip('should propagate request metadata', function (done) {
+    });
+
+    it.skip('should propagate response metadata', function (done) {
     });
 
     describe('negative', function () {
@@ -447,13 +455,13 @@ describe(__filename, function () {
             var port = portCounter++;
             server = Server.start(port);
 
-            var client = Trooba.transport(grpcTransport, {
+            var client = Trooba.use(grpcTransport, {
                 port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello',
                 connectTimeout: 1
-            }).create();
+            }).build('client:default');
 
             client.request$({
                 name: 'sayHello'
@@ -469,13 +477,13 @@ describe(__filename, function () {
             var port = portCounter++;
             server = Server.start(port);
 
-            var client = Trooba.transport(grpcTransport, {
+            var client = Trooba.use(grpcTransport, {
                 port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello',
                 socketTimeout: 10
-            }).create();
+            }).build('client:default');
 
             client.request$({
                 name: 'sayHello'
@@ -491,13 +499,13 @@ describe(__filename, function () {
             var port = portCounter++;
             server = Server.start(port);
 
-            var client = Trooba.transport(grpcTransport, {
+            var client = Trooba.use(grpcTransport, {
                 port: port,
                 hostname: 'bad-host',
                 proto: Server.proto,
                 serviceName: 'Hello',
                 connectTimeout: 200
-            }).create();
+            }).build('client:default');
 
             client.request$({
                 name: 'sayHello'
@@ -521,48 +529,53 @@ describe(__filename, function () {
             var port = portCounter++;
             server = Server.start(port);
 
-            var client = Trooba.transport(grpcTransport, {
+            var client = Trooba.use(grpcTransport, {
                 port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello'
-            }).create();
+            }).build('client:default');
 
-            client.beGreeted('timeout', function (err, response) {
+            client.beGreeted('timeout')
+            .on('error', function (err) {
                 Assert.ok(err);
                 Assert.equal('ETIMEDOUT', err.code);
                 Assert.equal('ESOCKTIMEDOUT', err.type);
                 done();
+            })
+            .on('data', function () {
+                done(new Error('Should never happen'));
             });
         });
 
-        it('should handle timeout error in response stream flow after firist chunk', function (done) {
+        it('should handle timeout error in response stream flow after first chunk', function (done) {
 
             var Server = require('./fixtures/hello-streaming/server');
 
             var port = 100 + portCounter++;
             server = Server.start(port);
 
-            var client = Trooba.transport(grpcTransport, {
+            var client = Trooba.use(grpcTransport, {
                 port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello',
                 socketTimeout: 100
-            }).create();
+            }).build('client:default');
 
             var counter = 0;
 
-            client.beGreeted('timeout-after-first-chunk', function onGreetResponse(err, response) {
-                if (counter++ === 0) {
-                    Assert.equal('Hello timeout-after-first-chunk from Bob', response);
-                }
-                else {
-                    Assert.ok(err);
-                    Assert.equal('ETIMEDOUT', err.code);
-                    Assert.equal('ESOCKTIMEDOUT', err.type);
-                    done();
-                }
+            client.beGreeted('timeout-after-first-chunk')
+            .on('data', function (data) {
+                counter++;
+                Assert.equal('Hello timeout-after-first-chunk from Bob', data);
+            })
+            .on('error', function (err) {
+                Assert.ok(err);
+                Assert.equal('ETIMEDOUT', err.code);
+                Assert.equal('ESOCKTIMEDOUT', err.type);
+                Assert.equal(1, counter);
+                done();
             });
         });
 
@@ -573,27 +586,29 @@ describe(__filename, function () {
             var port = portCounter++;
             server = Server.start(port);
 
-            var client = Trooba.transport(grpcTransport, {
+            var client = Trooba.use(grpcTransport, {
                 port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello'
-            }).create();
+            }).build('client:default');
 
             var messageCount = 0;
 
-            client.beGreeted('no-end', function (err, response) {
-                if (messageCount++ > 1) {
-                    Assert.ok(err);
-                    Assert.equal('ETIMEDOUT', err.code);
-                    Assert.equal('ESOCKTIMEDOUT', err.type);
-                    done();
-                }
-                Assert.ok(!err, err && err.stack);
+            client.beGreeted('no-end')
+            .on('data', function (data) {
+                messageCount++;
                 Assert.ok([
                     'Hello no-end from John',
                     'Hello no-end from Bob'
-                ].indexOf(response) !== -1);
+                ].indexOf(data) !== -1);
+            })
+            .on('error', function (err) {
+                Assert.ok(err);
+                Assert.equal('ETIMEDOUT', err.code);
+                Assert.equal('ESOCKTIMEDOUT', err.type);
+                Assert.equal(2, messageCount);
+                done();
             });
         });
 
@@ -603,29 +618,28 @@ describe(__filename, function () {
             var port = portCounter++;
             server = Server.start(port);
 
-            var client = Trooba.transport(grpcTransport, {
+            var client = Trooba.use(grpcTransport, {
                 port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello',
                 socketTimeout: 130
-            }).create();
+            }).build('client:default');
 
             var messageCount = 0;
 
-            client.beGreeted('slow', function (err, response) {
-                // getting reponse
-                Assert.ok(!err, err && err.stack);
-                if (err === undefined && response === undefined) {
-                    // reached the end
-                    Assert.equal(2, messageCount);
-                    done();
-                }
+            client.beGreeted('slow')
+            .on('data', function (data) {
                 messageCount++;
                 Assert.ok([
                     'Hello slow from John',
                     'Hello slow from Bob'
-                ].indexOf(response) !== -1);
+                ].indexOf(data) !== -1);
+            })
+            .on('error', done)
+            .on('end', function () {
+                Assert.equal(2, messageCount);
+                done();
             });
         });
 

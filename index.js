@@ -1,11 +1,13 @@
 'use strict';
 
-var EventEmitter = require('events').EventEmitter;
 var NodeUtils = require('util');
+var stream = require('stream');
 var Grpc = require('grpc');
 var Hoek = require('hoek');
 
-var connections = {};
+var Readable = stream.Readable;
+var Writable = stream.Writable;
+var Duplex = stream.Duplex;
 
 function debug() {
     module.exports.debug.apply(null, arguments);
@@ -13,66 +15,76 @@ function debug() {
 /**
  * Defines gRPC transport
 */
-module.exports = function grpcFactory(config) {
-    console.log('# grpc factory init');
-    var proto = config.proto;
-    if (typeof proto === 'string') {
-        proto = Grpc.load(proto);
-    }
-
-    var serviceMethods = extractService(proto, config.serviceName);
-    debug('# resolved service', config.serviceName, ', methods:', serviceMethods);
+module.exports = function grpcTransport(pipe, config) {
+    debug('# grpc init');
     // find a client and setup connection and error handling
     var endpoint = config.hostname + ':' + config.port;
 
-    debug('# connect: ', endpoint, config.credentials || '');
-    var client = connections[endpoint] = connections[endpoint] ||
-        new proto[config.serviceName](endpoint, config.credentials ||  Grpc.credentials.createInsecure(), config.options);
+    if (!config.$client) {
+        var proto = typeof proto === 'string' ?
+            Grpc.load(proto) : config.proto;
 
-    function grpcTransport(requestContext, reply) {
-        debug('# request context', requestContext);
+        var serviceMethods = extractService(proto, config.serviceName);
+        debug('# resolved service', config.serviceName, ', methods:', serviceMethods);
+
+        debug('# connect: ', endpoint, config.credentials || '');
+        config.$client = new proto[config.serviceName](endpoint,
+            config.credentials || Grpc.credentials.createInsecure(),
+            config.options);
+    }
+
+    pipe.on('request', function onRequest(request) {
+        debug('# request context', pipe.context, request);
         var readTimeout;
-        var request = requestContext.request;
-        // handle string operation name and operation attributes
-        var operationMeta = typeof request.operation === 'string' ? {
-            name: request.operation
-        } : request.operation;
 
         var args = [];
-        if (!operationMeta.requestStream) {
-            args.push(request.message);
+        if (!pipe.context.requestStream) {
+            args.push(request);
         }
-        if (request.metadata) {
-            args.push(request.metadata);
+        if (pipe.context.metadata) {
+            args.push(pipe.context.metadata);
         }
-        if (request.options) {
-            args.push(request.options);
+        if (pipe.context.options) {
+            args.push(pipe.context.options);
         }
 
         debug('# waiting for connection', endpoint);
 
         var waitForClientReady = process.domain ? process.domain.bind(waitForConnect) : waitForConnect;
 
-        Grpc.waitForClientReady(client,
+        Grpc.waitForClientReady(config.$client,
             Date.now() + (config.connectTimeout || 1000),
             waitForClientReady);
 
         function waitForConnect(err) {
             debug('# done waiting for connection', endpoint);
             var call;
-            var timedReply = function timedReply(err, response) {
+            var responseStream;
+            var timedReply = function timedReply(err, data) {
                 if (readTimeout) {
                     clearTimeout(readTimeout);
                     readTimeout = undefined;
                 }
-                if (operationMeta.responseStream && response) {
-                    // set new response timeout for the next chunk if not the end of stream
-                    debug('# setting up timeout for the next chunk');
-                    setupReadTimeout(call);
+
+                if (err) {
+                    pipe.throw(err);
+                    return;
                 }
-                reply.apply(null, arguments);
+
+                if (pipe.context.responseStream) {
+                    if (data) {
+                        // set new response timeout for the next chunk if not the end of stream
+                        debug('# setting up timeout for the next chunk');
+                        setupReadTimeout(call);
+                    }
+                    responseStream.write(data);
+                }
+                else {
+                    pipe.respond(data);
+                }
             };
-            if (!operationMeta.responseStream) {
+
+            if (!pipe.context.responseStream) {
                 timedReply = Hoek.once(timedReply);
                 setupReadTimeout();
 
@@ -84,19 +96,42 @@ module.exports = function grpcFactory(config) {
                 debug('# got error while connecting', endpoint, err);
                 return timedReply(err);
             }
-            debug('# calling', operationMeta.name);
-            call = client[operationMeta.name].apply(client, args);
 
-            if (operationMeta.requestStream || operationMeta.responseStream) {
-                debug('# detected streaming API request stream %s, response stream %s',
-                    operationMeta.requestStream, operationMeta.responseStream);
-                requestContext.emit('connection', call);
+            debug('# calling', pipe.context.operation);
+            call = config.$client[pipe.context.operation].apply(config.$client, args);
+
+            if (pipe.context.requestStream) {
+                pipe.on('request:data', function onRequestData(data) {
+                    debug('# request data:', data);
+                    if (data === undefined) {
+                        call.end();
+                        return;
+                    }
+                    call.write(data);
+                });
             }
 
-            if (operationMeta.responseStream) {
+            if (pipe.context.responseStream) {
                 var onceReply = Hoek.once(timedReply);
+                responseStream = pipe.streamResponse({});
 
-                call.on('data', timedReply.bind(null, null));
+                call.on('status', function onStatus(status) {
+                    pipe.send({
+                        type: 'response:status',
+                        flow: 2,
+                        ref: status
+                    });
+                    pipe.send({
+                        type: 'response:metadata',
+                        flow: 2,
+                        ref: status.metadata
+                    });
+                });
+
+                call.on('data', function onData(data) {
+                    timedReply(null, data.message);
+                });
+
                 call.once('end', onceReply);
                 call.once('error', onceReply);
                 call.on('error', Hoek.once(function cleanup(err) {
@@ -109,6 +144,17 @@ module.exports = function grpcFactory(config) {
                 setupReadTimeout(call);
             }
 
+            if (pipe.context.requestStream || pipe.context.responseStream) {
+                debug('# detected streaming API request stream %s, response stream %s',
+                    pipe.context.requestStream, pipe.context.responseStream);
+
+                pipe.send({
+                    flow: 2, //Trooba.Types.RESPONSE = 2
+                    type: 'connection',
+                    ref: call
+                });
+            }
+
             function setupReadTimeout(emitter) {
                 if (readTimeout) {
                     debug('# clearing current response timeout');
@@ -118,7 +164,7 @@ module.exports = function grpcFactory(config) {
                 debug('# setting up response timeout', responseTimeout);
 
                 readTimeout = setTimeout(function _readTimeout() {
-                    var err = new Error('Response timeout ' + endpoint + ', operation ' + request.operation.name);
+                    var err = new Error('Response timeout ' + endpoint + ', operation ' + pipe.context.operation);
                     err.code = 'ETIMEDOUT';
                     err.type = 'ESOCKTIMEDOUT';
                     if (emitter) {
@@ -130,36 +176,50 @@ module.exports = function grpcFactory(config) {
                 }, responseTimeout);
             }
         }
+    });
 
-    }
+    pipe.set('client:default', api);
 
-    grpcTransport.api = function api(pipe) {
+    function api(pipe) {
 
-        function genericRequest(operationMeta, message, callback) {
+        function genericRequest(operation, message, callback) {
+console.log('>>>>>>', arguments)
             var args = [].slice.call(arguments);
-            operationMeta = args.shift();
-            callback = args.pop();
-            message = args.pop();
+            operation = args.shift();
+            callback = operation.responseStream ? undefined : args.pop();
+            message = args.shift();
 
-            debug('# pipe for', operationMeta.name, message);
+            debug('# pipe for', operation.name, message);
 
-            var requestContext = new EventEmitter();
-            requestContext.request = {
-                message: message,
-                operation: operationMeta
-            };
+            var requestMethod = operation.requestStream ? 'streamRequest' : 'request';
 
-            pipe(requestContext, function onResponse(responseContext) {
-                debug('# got response context', responseContext);
-                if (responseContext === undefined) {
-                    // detected end of stream
-                    return callback();
-                }
-                callback(responseContext.error,
-                    responseContext.response && responseContext.response.message);
+            pipe = pipe.create({
+                requestStream: !!operation.requestStream,
+                responseStream: !!operation.responseStream,
+                operation: operation.name
             });
 
-            return requestContext;
+            pipe[requestMethod](message);
+
+            if (operation.responseStream && operation.requestStream) {
+                return new ClientDuplexStream(pipe);
+            }
+
+            if (operation.responseStream) {
+                return new ClientReadableStream(pipe);
+            }
+            else {
+                pipe
+                .once('response', function onResponse(response) {
+                    callback(null, response.message);
+                })
+                .once('error', callback);
+            }
+
+            if (operation.requestStream) {
+                return new ClientWritableStream(pipe);
+            }
+
         }
 
         var client = serviceMethods.reduce(function reduce(memo, methodMeta) {
@@ -173,9 +233,7 @@ module.exports = function grpcFactory(config) {
         });
 
         return client;
-    };
-
-    return grpcTransport;
+    }
 };
 
 function extractService(proto, serviceName) {
@@ -231,6 +289,105 @@ function selectServices(proto, base, collection) {
 
     return collection;
 }
+
+/**
+ * A stream that the client can write to. It will buffer data till it is ready
+ */
+function ClientWritableStream(pipe) {
+    Writable.call(this, {objectMode: true});
+    this._init(pipe);
+}
+
+NodeUtils.inherits(ClientWritableStream, Writable);
+
+function _initWrite(pipe) {
+    /*jshint validthis:true */
+    var self = this;
+
+    pipe.on('connection', function onConnection() {
+        self._requestStream = pipe.context.$requestStream;
+        self._requestStream.write(self._resume.message);
+        self._resume && self._resume.done();
+    });
+
+    self.on('finish', function onStreamFinish() {
+        this._requestStream.end();
+    });
+}
+
+function _write(message, encoding, callback) {
+    /*jshint validthis:true */
+    if (this._requestStream) {
+        this._requestStream.write(message);
+        return callback();
+    }
+
+    this._resume = {
+        message: message,
+        done: callback
+    };
+}
+
+ClientWritableStream.prototype._write = _write;
+ClientWritableStream.prototype._init = _initWrite;
+
+/**
+ * A stream that the client can read from.
+ */
+function ClientReadableStream(pipe) {
+    Readable.call(this, {objectMode: true});
+
+    this._init(pipe);
+}
+
+NodeUtils.inherits(ClientReadableStream, Readable);
+
+function _initRead(pipe) {
+    /*jshint validthis:true */
+    var self = this;
+    self._responseBuffer = [];
+
+    pipe.on('response:data', function onData(data) {
+        if (self._paused) {
+            self._responseBuffer.push(data);
+            return;
+        }
+        // TODO: need to send signal back to the write side when then need to pause
+        // and drain even on ready, for now use buffer
+        self._paused = !self.push(data === undefined ? null : data);
+    });
+
+    pipe.on('error', function onErr(err) {
+        self.emit('error', err);
+    });
+}
+
+function _read() {
+    /*jshint validthis:true */
+    this._paused = false;
+    while (this._responseBuffer.length) {
+        this._paused = !this.push(this._responseBuffer.shift());
+        if (this._paused) {
+            return;
+        }
+    }
+}
+
+ClientReadableStream.prototype._read = _read;
+ClientReadableStream.prototype._init = _initRead;
+
+function ClientDuplexStream(pipe) {
+    Duplex.call(this, {objectMode: true});
+    this._initWrite(pipe);
+    this._initRead(pipe);
+}
+
+NodeUtils.inherits(ClientDuplexStream, Duplex);
+
+ClientDuplexStream.prototype._initRead = _initRead;
+ClientDuplexStream.prototype._initWrite = _initWrite;
+ClientDuplexStream.prototype._read = _read;
+ClientDuplexStream.prototype._write = _write;
 
 module.exports.Utils = {
     selectServices: selectServices,

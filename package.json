@@ -11,7 +11,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/dimichgh/trooba-grpc-transport.git"
+    "url": "git+https://github.com/trooba/trooba-grpc-transport.git"
   },
   "keywords": [
     "grpc",
@@ -23,13 +23,13 @@
   "author": "Dmytro Semenov <dimichsdg@yahoo.com>",
   "license": "MIT",
   "bugs": {
-    "url": "https://github.com/dimichgh/trooba-grpc-transport/issues"
+    "url": "https://github.com/trooba/trooba-grpc-transport/issues"
   },
-  "homepage": "https://github.com/dimichgh/trooba-grpc-transport#readme",
+  "homepage": "https://github.com/trooba/trooba-grpc-transport#readme",
   "devDependencies": {
     "async": "^2.1.2",
     "mocha": "^3.1.2",
-    "trooba": "^0"
+    "trooba": "^1"
   },
   "dependencies": {
     "grpc": "^1.0.1",

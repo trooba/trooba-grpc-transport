@@ -13,10 +13,10 @@ npm install trooba-grpc-transport --save
 #### Service invocation
 
 ```js
-var grpcTransportFactory = require('trooba-grpc-transport');
+var grpcTransport = require('trooba-grpc-transport');
 
 require('trooba')
-    .transport(grpcTransportFactory, {
+    .use(grpcTransport, {
         protocol: 'http:',
         hostname: 'grpc.service.my',
         port: 50001,
@@ -24,7 +24,7 @@ require('trooba')
         connectTimeout: 100,
         socketTimeout: 1000
     })
-    .create()
+    .build('client:default')
     .hello('Bob', function (err, response) {
         console.log(err, response)
     });
