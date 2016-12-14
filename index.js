@@ -4,6 +4,7 @@ var NodeUtils = require('util');
 var stream = require('stream');
 var Grpc = require('grpc');
 var Hoek = require('hoek');
+var _ = require('lodash');
 
 var Readable = stream.Readable;
 var Writable = stream.Writable;
@@ -39,13 +40,17 @@ module.exports = function grpcTransport(pipe, config) {
 
         var args = [];
         if (!pipe.context.requestStream) {
-            args.push(request);
+            args.push(request.body);
         }
-        if (pipe.context.metadata) {
-            args.push(pipe.context.metadata);
+        if (request.headers) {
+            var meta = new Grpc.Metadata();
+            Object.keys(request.headers).forEach(function forEach(name) {
+                meta.set(name, request.headers[name]);
+            });
+            args.push(meta);
         }
-        if (pipe.context.options) {
-            args.push(pipe.context.options);
+        if (request.options) {
+            args.push(request.options);
         }
 
         debug('# waiting for connection', endpoint);
@@ -59,7 +64,10 @@ module.exports = function grpcTransport(pipe, config) {
         function waitForConnect(err) {
             debug('# done waiting for connection', endpoint);
             var call;
+            var responseStatus;
             var responseStream;
+            var startResponseStream;
+
             var timedReply = function timedReply(err, data) {
                 if (readTimeout) {
                     clearTimeout(readTimeout);
@@ -71,17 +79,26 @@ module.exports = function grpcTransport(pipe, config) {
                     return;
                 }
 
-                if (pipe.context.responseStream) {
-                    if (data) {
-                        // set new response timeout for the next chunk if not the end of stream
-                        debug('# setting up timeout for the next chunk');
-                        setupReadTimeout(call);
+                setImmediate(function defer() {
+                    if (data && responseStatus) {
+                        data.status = _.assignIn(data.status || {}, responseStatus.status);
+                        data.headers = _.assignIn(data.headers || {}, responseStatus.headers);
                     }
-                    responseStream.write(data);
-                }
-                else {
-                    pipe.respond(data);
-                }
+                    // clear it
+                    responseStatus = undefined;
+                    if (pipe.context.responseStream) {
+                        if (data) {
+                            // set new response timeout for the next chunk if not the end of stream
+                            debug('# setting up timeout for the next chunk');
+                            setupReadTimeout(call);
+                        }
+                        responseStream.write(data);
+                    }
+                    else {
+                        pipe.respond(data);
+                    }
+                });
+
             };
 
             if (!pipe.context.responseStream) {
@@ -100,6 +117,19 @@ module.exports = function grpcTransport(pipe, config) {
             debug('# calling', pipe.context.operation);
             call = config.$client[pipe.context.operation].apply(config.$client, args);
 
+            call.on('status', function onStatus(status) {
+                responseStatus = responseStatus || {};
+                responseStatus.status = status;
+                responseStatus.headers = _.assignIn(
+                    responseStatus.headers || {}, status.metadata.getMap());
+            });
+
+            call.on('metadata', function onStatus(metadata) {
+                responseStatus = responseStatus || {};
+                responseStatus.headers = _.assignIn(
+                    responseStatus.headers || {}, metadata.getMap());
+            });
+
             if (pipe.context.requestStream) {
                 pipe.on('request:data', function onRequestData(data) {
                     debug('# request data:', data);
@@ -113,27 +143,21 @@ module.exports = function grpcTransport(pipe, config) {
 
             if (pipe.context.responseStream) {
                 var onceReply = Hoek.once(timedReply);
-                responseStream = pipe.streamResponse({});
-
-                call.on('status', function onStatus(status) {
-                    pipe.send({
-                        type: 'response:status',
-                        flow: 2,
-                        ref: status
-                    });
-                    pipe.send({
-                        type: 'response:metadata',
-                        flow: 2,
-                        ref: status.metadata
-                    });
+                startResponseStream = Hoek.once(function startResponseStream() {
+                    responseStream = pipe.streamResponse(responseStatus || {});
+                    responseStatus = undefined;
                 });
 
                 call.on('data', function onData(data) {
-                    timedReply(null, data.message);
+                    startResponseStream();
+                    timedReply(null, data);
                 });
 
-                call.once('end', onceReply);
-                call.once('error', onceReply);
+                call.once('end', function () {
+                    startResponseStream();
+                    onceReply();
+                });
+                call.once('error', timedReply);
                 call.on('error', Hoek.once(function cleanup(err) {
                     debug('# error', err);
                     call.removeListener('data', timedReply);
@@ -183,7 +207,6 @@ module.exports = function grpcTransport(pipe, config) {
     function api(pipe) {
 
         function genericRequest(operation, message, callback) {
-console.log('>>>>>>', arguments)
             var args = [].slice.call(arguments);
             operation = args.shift();
             callback = operation.responseStream ? undefined : args.pop();
@@ -199,7 +222,9 @@ console.log('>>>>>>', arguments)
                 operation: operation.name
             });
 
-            pipe[requestMethod](message);
+            pipe[requestMethod]({
+                body: message
+            });
 
             if (operation.responseStream && operation.requestStream) {
                 return new ClientDuplexStream(pipe);
@@ -306,7 +331,7 @@ function _initWrite(pipe) {
 
     pipe.on('connection', function onConnection() {
         self._requestStream = pipe.context.$requestStream;
-        self._requestStream.write(self._resume.message);
+        self._resume && self._requestStream.write(self._resume.message);
         self._resume && self._resume.done();
     });
 
@@ -354,7 +379,7 @@ function _initRead(pipe) {
         }
         // TODO: need to send signal back to the write side when then need to pause
         // and drain even on ready, for now use buffer
-        self._paused = !self.push(data === undefined ? null : data);
+        self._paused = !self.push(data === undefined ? null : data.message);
     });
 
     pipe.on('error', function onErr(err) {
