@@ -17,9 +17,11 @@ function sayHello(call, callback) {
     var names = [];
     call.on('data', function onData(message) {
         names.push(message.name);
+        if (names.length === 2) {
+            callback(null, {message: 'Hello ' + names.join(' and ')});
+        }
     });
     call.on('end', function onEnd() {
-        callback(null, {message: 'Hello ' + names.join(' and ')});
     });
 }
 

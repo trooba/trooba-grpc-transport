@@ -172,10 +172,12 @@ module.exports = function grpcTransport(pipe, config) {
                 debug('# detected streaming API request stream %s, response stream %s',
                     pipe.context.requestStream, pipe.context.responseStream);
 
-                pipe.send({
-                    flow: 2, //Trooba.Types.RESPONSE = 2
-                    type: 'connection',
-                    ref: call
+                setImmediate(function () {
+                    pipe.send({
+                        flow: 2, //Trooba.Types.RESPONSE = 2
+                        type: 'connection',
+                        ref: call
+                    });
                 });
             }
 
