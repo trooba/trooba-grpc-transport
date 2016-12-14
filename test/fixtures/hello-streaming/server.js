@@ -7,6 +7,13 @@ var hello_proto = Grpc.load(require.resolve('./hello.proto'));
  * Implements the SayHello RPC method.
  */
 function sayHello(call, callback) {
+    var meta = new Grpc.Metadata();
+    meta.set('foo', 'bar');
+    if (call.metadata.getMap().qaz) {
+        meta.set('rfv', call.metadata.getMap().qaz);
+    }
+    call.sendMetadata(meta);
+
     var names = [];
     call.on('data', function onData(message) {
         names.push(message.name);
@@ -20,7 +27,21 @@ function beGreeted(call, callback) {
     if (call.request.name === 'timeout') {
         return;
     }
+    
     var reply = 'Hello ' + call.request.name;
+
+    if (call.request.name === 'massive') {
+        for (var j = 0; j < 1000; j++) {
+            call.write(reply + ' from John' + j);
+        }
+        call.end();
+        return;
+    }
+
+    var meta = new Grpc.Metadata();
+    meta.set('foo', 'bar');
+    call.sendMetadata(meta);
+
     var array = ['Bob', 'John'];
     for (var i = 0; i < array.length; i++) {
         if (i > 0 && call.request.name === 'timeout-after-first-chunk') {
@@ -45,6 +66,13 @@ function beGreeted(call, callback) {
 }
 
 function sayHelloAll(call, callback) {
+    var meta = new Grpc.Metadata();
+    meta.set('foo', 'bar');
+    if (call.metadata.getMap().qaz) {
+        meta.set('rfv', call.metadata.getMap().qaz);
+    }
+    call.sendMetadata(meta);
+
     call.on('data', function onData(message) {
         call.write('Hello ' + message.name);
     });

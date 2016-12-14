@@ -4,10 +4,21 @@ var Fs = require('fs');
 var Grpc = require('grpc');
 var hello_proto = Grpc.load(require.resolve('./hello.proto'));
 
+var lastServer;
 /**
  * Implements the SayHello RPC method.
  */
 function sayHello(call, callback) {
+    if (call.request.name === 'disconnect') {
+        lastServer.forceShutdown();
+        return;
+    }
+    var meta = new Grpc.Metadata();
+    meta.set('foo', 'bar');
+    if (call.metadata.getMap().qaz) {
+        meta.set('rfv', call.metadata.getMap().qaz);
+    }
+    call.sendMetadata(meta);
     callback(null, {message: 'Hello ' + call.request.name});
 }
 
@@ -21,6 +32,7 @@ module.exports.start = function start(port) {
     server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
     server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
     server.start();
+    lastServer = server;
     return server;
 };
 
