@@ -984,15 +984,18 @@ describe(__filename, function () {
             })
             .on('error', function (err) {
                 Assert.ok(err);
-                Assert.equal('ETIMEDOUT', err.code);
                 done();
             });
 
             // sending request
             call.write('John');
-            server.forceShutdown();
-            call.write('Bob');
-            call.end();
+            setTimeout(function () {
+                server.forceShutdown();
+                setTimeout(function () {
+                    call.write('Bob');
+                    call.end();
+                }, 500);
+            }, 500);
         });
 
         it('should handle re-connect', function (done) {
