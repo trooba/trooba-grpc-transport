@@ -17,11 +17,9 @@ function sayHello(call, callback) {
     var names = [];
     call.on('data', function onData(message) {
         names.push(message.name);
-        if (names.length === 2) {
-            callback(null, {message: 'Hello ' + names.join(' and ')});
-        }
     });
     call.on('end', function onEnd() {
+        callback(null, {message: 'Hello ' + names.join(' and ')});
     });
 }
 
@@ -29,12 +27,21 @@ function beGreeted(call, callback) {
     if (call.request.name === 'timeout') {
         return;
     }
+    
+    var reply = 'Hello ' + call.request.name;
+
+    if (call.request.name === 'massive') {
+        for (var j = 0; j < 1000; j++) {
+            call.write(reply + ' from John' + j);
+        }
+        call.end();
+        return;
+    }
 
     var meta = new Grpc.Metadata();
     meta.set('foo', 'bar');
     call.sendMetadata(meta);
 
-    var reply = 'Hello ' + call.request.name;
     var array = ['Bob', 'John'];
     for (var i = 0; i < array.length; i++) {
         if (i > 0 && call.request.name === 'timeout-after-first-chunk') {

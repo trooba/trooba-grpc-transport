@@ -92,6 +92,10 @@ module.exports = function grpcTransport(pipe, config) {
                             debug('# setting up timeout for the next chunk');
                             setupReadTimeout(call);
                         }
+                        if (data) {
+                            data.body = data.message;
+                            delete data.message;
+                        }
                         responseStream.write(data);
                     }
                     else {
@@ -376,12 +380,12 @@ function _initRead(pipe) {
 
     pipe.on('response:data', function onData(data) {
         if (self._paused) {
-            self._responseBuffer.push(data);
+            self._responseBuffer.push(data ? data.body : null);
             return;
         }
         // TODO: need to send signal back to the write side when then need to pause
         // and drain even on ready, for now use buffer
-        self._paused = !self.push(data === undefined ? null : data.message);
+        self._paused = !self.push(data === undefined ? null : data.body);
     });
 
     pipe.on('error', function onErr(err) {

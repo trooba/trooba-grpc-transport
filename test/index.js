@@ -757,24 +757,6 @@ describe(__filename, function () {
             });
         });
 
-        it.skip('should handle call.write pause at client side', function (done) {
-        });
-
-        it.skip('should handle call.write pause at transport side', function (done) {
-        });
-
-        it.skip('should handle call.read drain at client side', function (done) {
-        });
-
-        it.skip('should handle call.read drain at transport side', function (done) {
-        });
-
-        it.skip('should handle massive number of response chunks', function (done) {
-        });
-
-        it.skip('should handle massive number of request chunks', function (done) {
-        });
-
         it('should handle timeout error in response stream flow', function (done) {
 
             var Server = require('./fixtures/hello-streaming/server');
@@ -1074,6 +1056,129 @@ describe(__filename, function () {
             }, 500);
         });
 
+    });
+
+    it('should handle write pause at client side', function (done) {
+        var Server = require('./fixtures/hello-streaming/server');
+
+        var port = portCounter++;
+
+        var client = Trooba.use(grpcTransport, {
+            port: port,
+            hostname: 'localhost',
+            proto: Server.proto,
+            serviceName: 'Hello',
+            connectTimeout: 2000
+        }).build({
+            // trace: true,
+            // tracer$: function (message, point) {
+            //     console.log('*** trace: ', point._id , point.handler.name, message.type, message.context.$points)
+            // }
+        }, 'client:default');
+
+        var names = [];
+        var paused = false;
+        var drained = false;
+        var call = client.sayHello(function (err, response) {
+            // getting reponse
+            Assert.ok(!err, err && err.stack);
+            Assert.equal(1000, names.length);
+            Assert.equal('Hello ' + names.join(' and '), response);
+            Assert.ok(paused);
+            Assert.ok(drained);
+            done();
+        });
+
+        function write(index) {
+            index = index || 0;
+            for (var i = index; i < 1000; i++) {
+                var name = 'John' + i;
+                names.push(name);
+                if (!call.write(name)) {
+                    paused = true;
+                    call.on('drain', drain);
+                    return;
+                }
+            }
+            function drain() {
+                drained = true;
+                write(i + 1);
+            }
+            call.end();
+        }
+
+        write();
+
+        setTimeout(function () {
+            server = Server.start(port);
+        }, 500);
+    });
+
+    it('should handle write pause at transport side, request stream', function (done) {
+        var Server = require('./fixtures/hello-streaming/server');
+
+        var port = portCounter++;
+
+        var client = Trooba.use(grpcTransport, {
+            port: port,
+            hostname: 'localhost',
+            proto: Server.proto,
+            serviceName: 'Hello',
+            connectTimeout: 2000
+        }).build({
+            // trace: true,
+            // tracer$: function (message, point) {
+            //     console.log('*** trace: ', point._id , point.handler.name, message.type, message.context.$points)
+            // }
+        }, 'client:default');
+
+        var call = client.sayHello(function (err, response) {
+            // getting reponse
+            Assert.ok(!err, err && err.stack);
+            Assert.equal('Hello John and Bob', response);
+            done();
+        });
+
+        call.write('John');
+        call.write('Bob');
+        call.end();
+
+        setTimeout(function () {
+            server = Server.start(port);
+        }, 500);
+    });
+
+    it.only('should handle call.read drain at client side', function (done) {
+        this.timeout(5000);
+        var Server = require('./fixtures/hello-streaming/server');
+
+        var port = portCounter++;
+        server = Server.start(port);
+
+        var client = Trooba.use(grpcTransport, {
+            port: port,
+            hostname: 'localhost',
+            proto: Server.proto,
+            serviceName: 'Hello'
+        }).build('client:default');
+
+        var messageCount = 0;
+
+        var call = client.beGreeted('massive');
+
+        setTimeout(function () {
+            call
+            .on('data', function (data) {
+                messageCount++;
+                Assert.ok(!data || data.indexOf('Hello massive from John') === 0);
+            })
+            .on('end', function () {
+                // reached the end
+                Assert.equal(1000, messageCount);
+                done();
+            })
+            .on('error', done);
+        }, 1000);
     });
 
     describe('parallel', function () {
