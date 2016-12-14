@@ -1148,7 +1148,7 @@ describe(__filename, function () {
         }, 500);
     });
 
-    it.only('should handle call.read drain at client side', function (done) {
+    it('should handle call.read drain at client side', function (done) {
         this.timeout(5000);
         var Server = require('./fixtures/hello-streaming/server');
 
