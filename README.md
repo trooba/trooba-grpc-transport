@@ -197,5 +197,5 @@ var pipeServer = Trooba
     hostname: 'localhost',
     proto: Server.proto
 })
-.use(controller());
+.use(routes());
 ```
