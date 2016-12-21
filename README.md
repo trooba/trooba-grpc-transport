@@ -31,7 +31,7 @@ Once request/response/data chunk enters the trooba pipeline, it assumes more gen
 
 Trooba framework does not dictate specific data structures that should be used for request/response/messages/stream objects. It assumes basic requirements and leaves everything else to the implementor of the transport.
 
-This transport assumptions are:
+This transport goes further and defines some specifics for data it operates with:
 * Possible flows:
   * request/response is a basic interaction between client and service
   * request/stream is a flow where for a single request it results in response stream
@@ -52,7 +52,7 @@ This transport assumptions are:
 * Data chunk matches gRPC streaming data
 
 The client transport uses two timeouts:
-* connextTimeout sets the deadline for establishing the connection
+* connectTimeout sets the deadline for establishing the connection
 * socketTimeout sets the deadline for response or any further response chunk; whenever a new chunk is received the transport resets the socket timeout
 
 ## Usage
@@ -66,7 +66,7 @@ var grpcTransport = require('trooba-grpc-transport');
 require('trooba')
     .use(grpcTransport, {
         protocol: 'http:',
-        hostname: 'grpc.service.my',
+        hostname: 'localhost',
         port: port,
         proto: require.resolve('path/to/hello.proto'),
         connectTimeout: 100,
@@ -82,8 +82,6 @@ require('trooba')
 
 ```js
 syntax = "proto3";
-
-option java_package = "com.app.sample.grpc";
 
 // The hello service definition.
 service Hello {
@@ -163,3 +161,41 @@ console.log('toorba service is listening on port:', port);
 
 For more advanced examples, please take a look at [unit tests](test)
 You can also find an implementation of simple service router [here](test/fixtures/server) and using the service [here](test/fixtures/server.js)
+
+* Router example:
+
+```js
+module.exports = function routes() {
+    var router = Router.create();
+    router.use({
+        path: 'com/xyz/helloworld/Hello/sayHello',
+        handle: require('./sayHello')
+    });
+    router.use({
+        path: 'Hello/sayHello',
+        handle: require('./sayHello')
+    });
+    router.use({
+        path: 'Hello/sayHelloAll',
+        handle: require('./sayHelloAll')
+    });
+    router.use({
+        path: 'Hello/beGreeted',
+        handle: require('./beGreeted')
+    });
+
+    return router.build();
+};
+```
+
+* Service:
+
+```js
+var pipeServer = Trooba
+.use(transport, {
+    port: 40000,
+    hostname: 'localhost',
+    proto: Server.proto
+})
+.use(controller());
+```

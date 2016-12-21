@@ -4,7 +4,7 @@ var Assert = require('assert');
 var Trooba = require('trooba');
 
 var transport = require('..');
-var controller = require('./fixtures/server/controller');
+var routes = require('./fixtures/server/routes');
 
 describe(__filename, () => {
     var svr;
@@ -22,7 +22,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(controller());
+        .use(routes());
 
         var app = pipeServer.build('server:default');
 
@@ -52,7 +52,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(controller());
+        .use(routes());
 
         var app = pipeServer.build('server:default');
 
@@ -82,7 +82,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(controller());
+        .use(routes());
 
         var app = pipeServer.build('server:default');
 
@@ -126,7 +126,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(controller());
+        .use(routes());
 
         var app = pipeServer.build('server:default');
 
@@ -156,7 +156,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(controller());
+        .use(routes());
 
         var app = pipeServer.build('server:default');
 
@@ -201,7 +201,7 @@ describe(__filename, () => {
         .use(function dummy(pipe) {
             // nothing, just to have a pipeline
         })
-        .use(function controller(pipe) {
+        .use(function routes(pipe) {
             var names = [];
             pipe.on('request', function onData(request) {
             });
@@ -254,7 +254,7 @@ describe(__filename, () => {
         .use(function dummy(pipe) {
             // nothing, just to have a pipeline
         })
-        .use(controller());
+        .use(routes());
 
         var app = pipeServer.build('server:default');
 
@@ -309,7 +309,7 @@ describe(__filename, () => {
         .use(function dummy(pipe) {
             // nothing, just to have a pipeline
         })
-        .use(controller());
+        .use(routes());
 
         var app = pipeServer.build('server:default');
 
@@ -333,7 +333,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(controller());
+        .use(routes());
 
         var app = pipeServer.build('server:default');
 
