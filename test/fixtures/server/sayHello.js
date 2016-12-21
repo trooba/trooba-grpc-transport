@@ -1,9 +1,19 @@
 'use strict';
 
 module.exports = function (request, pipe) {
-    pipe.respond({
+    if (request.body.name === 'error') {
+        return pipe.throw(new Error('Test Error'));
+    }
+    var response = {
         body: 'Hello ' + request.body.name
-    });
+    };
+    if (request.headers.meta) {
+        response.headers = {
+            foo: 'bar',
+            qaz: request.headers.qaz
+        };
+    }
+    pipe.respond(response);
 };
 
 // module.exports = function (request, pipe) {

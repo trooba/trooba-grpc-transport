@@ -44,6 +44,80 @@ describe(__filename, () => {
         });
     });
 
+    it('should get error', (done) => {
+        var Server = require('./fixtures/hello/server');
+
+        var pipeServer = Trooba.use(transport, {
+            port: 0,
+            hostname: 'localhost',
+            proto: Server.proto
+        })
+        .use(controller());
+
+        var app = pipeServer.build('server:default');
+
+        svr = app.listen();
+        Assert.ok(svr.port);
+
+        var pipeClient = Trooba.use(transport, {
+            port: svr.port,
+            hostname: 'localhost',
+            proto: Server.proto,
+            serviceName: 'Hello'
+        });
+        var client = pipeClient.build('client:default');
+
+        client.sayHello('error', function (err, response) {
+            Assert.ok(err);
+            Assert.equal('Test Error', err.message);
+            done();
+        });
+    });
+
+    it('should send and receive metadata', (done) => {
+        var Server = require('./fixtures/hello/server');
+
+        var pipeServer = Trooba.use(transport, {
+            port: 0,
+            hostname: 'localhost',
+            proto: Server.proto
+        })
+        .use(controller());
+
+        var app = pipeServer.build('server:default');
+
+        svr = app.listen();
+        Assert.ok(svr.port);
+
+        var meta;
+        var pipeClient = Trooba
+        .use(function catchHeaders(pipe) {
+            pipe.on('response', function (response, next) {
+                meta = response.headers;
+                next();
+            });
+        })
+        .use(transport, {
+            port: svr.port,
+            hostname: 'localhost',
+            proto: Server.proto,
+            serviceName: 'Hello'
+        });
+        var client = pipeClient.build('client:default');
+
+        client.sayHello('John', {
+            meta: true,
+            qaz: 'edc'
+        }, function (err, response) {
+            Assert.ok(!err);
+            Assert.deepEqual({
+                qaz: 'edc',
+                foo: 'bar'
+            }, meta);
+            done();
+        });
+    });
+
     it('should start the server and do request/reponse with namespace', (done) => {
         var Server = require('./fixtures/hello-pkg/server');
 
@@ -221,5 +295,62 @@ describe(__filename, () => {
         call.write('Bob');
         call.end();
 
+    });
+
+    it('should fail to start server twice on the same endpoint when it is already running',
+    function (done) {
+        var Server = require('./fixtures/hello-streaming/server');
+        var pipeServer = Trooba
+        .use(transport, {
+            port: 40000,
+            hostname: 'localhost',
+            proto: Server.proto
+        })
+        .use(function dummy(pipe) {
+            // nothing, just to have a pipeline
+        })
+        .use(controller());
+
+        var app = pipeServer.build('server:default');
+
+        svr = app.listen();
+
+        Assert.throws(function () {
+            app.listen();
+        }, /The service is already running:localhost:40000/);
+
+        app.listen(function (err) {
+            Assert.equal('The service is already running:localhost:40000', err.message);
+            done();
+        });
+    });
+
+    it('should force shutdown', function (done) {
+        var Server = require('./fixtures/hello-streaming/server');
+        var pipeServer = Trooba
+        .use(transport, {
+            port: 40000,
+            hostname: 'localhost',
+            proto: Server.proto
+        })
+        .use(controller());
+
+        var app = pipeServer.build('server:default');
+
+        svr = app.listen();
+
+        var pipeClient = Trooba.use(transport, {
+            port: svr.port,
+            hostname: 'localhost',
+            proto: Server.proto,
+            serviceName: 'Hello'
+        });
+        var client = pipeClient.build('client:default');
+        client.sayHelloAll();
+
+        svr.close(function (isForced) {
+            Assert.ok(isForced);
+            done();
+        }, 1);
     });
 });

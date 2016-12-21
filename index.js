@@ -48,7 +48,7 @@ module.exports = function grpcTransport(pipe, config) {
         if (request.headers) {
             const meta = new Grpc.Metadata();
             Object.keys(request.headers).forEach(function forEach(name) {
-                meta.set(name, request.headers[name]);
+                meta.set(name, ''+request.headers[name]);
             });
             args.push(meta);
         }
@@ -189,10 +189,6 @@ module.exports = function grpcTransport(pipe, config) {
             }
 
             function setupReadTimeout(emitter) {
-                if (readTimeout) {
-                    debug('# clearing current response timeout');
-                    clearTimeout(readTimeout);
-                }
                 const responseTimeout = config.socketTimeout || 1000;
                 debug('# setting up response timeout', responseTimeout);
 
@@ -259,6 +255,7 @@ module.exports = function grpcTransport(pipe, config) {
                         });
                         server.tryShutdown(cleanup);
                         setTimeout(() => {
+                            debug('# forced shutdown');
                             server.forceShutdown();
                             cleanup();
                         }, timeout || 1000);

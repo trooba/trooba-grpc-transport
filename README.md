@@ -7,7 +7,7 @@
 
 gRPC transport for [trooba](https://github.com/trooba/trooba) pipeline.
 
-The module provides a *client* and *service* side gRPC transport implementation.
+The module provides a *client* and *service* side gRPC transport implementation for [trooba](https://github.com/trooba/trooba) pipeline.
 
 ## Get Involved
 
@@ -22,6 +22,38 @@ The module provides a *client* and *service* side gRPC transport implementation.
 ```
 npm install trooba-grpc-transport --save
 ```
+
+## Architecture
+
+The module exports service and client API which matches exactly the API provided by [gRPC](https://github.com/grpc/grpc/tree/master/src/node) module.
+
+Once request/response/data chunk enters the trooba pipeline, it assumes more generic API and request like data structures.
+
+Trooba framework does not dictate specific data structures that should be used for request/response/messages/stream objects. It assumes basic requirements and leaves everything else to the implementor of the transport.
+
+This transport assumptions are:
+* Possible flows:
+  * request/response is a basic interaction between client and service
+  * request/stream is a flow where for a single request it results in response stream
+  * stream/response is a flow where for request stream the backend generates a single response
+  * stream/stream is a flow where for the request stream the backend generates a response stream
+* All the above flows use request and response object to initiate the flow and streaming uses arbitrary data chunks
+* Request object structure:
+  * **body** contains request data which is a message object in gRPC terms
+  * **headers** contains request headers that match gRPC metadata
+  * **path** matches gRPC package namespace and service name separated by '/'. For example:
+  ```
+  'foo.bar.v1.Hello.sayHello' => '/foo/bar/v1/Hello/sayHello'
+  ```
+* Response object structure:
+  * **body** contains response data which is a message object in gRPC terms
+  * **headers** contains response headers that match gRPC metadata
+  * **status** is gRPC status
+* Data chunk matches gRPC streaming data
+
+The client transport uses two timeouts:
+* connextTimeout sets the deadline for establishing the connection
+* socketTimeout sets the deadline for response or any further response chunk; whenever a new chunk is received the transport resets the socket timeout
 
 ## Usage
 
@@ -86,12 +118,12 @@ var pipeServer = Trooba.use(transport, {
         next();
     });
     pipe.on('request:data', (data, next) => {
-        // do something with request
+        // do something with request stream data chunk
         console.log('request chunk:', data);
         next();
     });
     pipe.on('request:end', (data, next) => {
-        // do something with request
+        // do something with stream end
         console.log('end of request stream');
         next();
     });
@@ -102,12 +134,12 @@ var pipeServer = Trooba.use(transport, {
         next();
     });
     pipe.on('response:data', (data, next) => {
-        // do something with response
+        // do something with response stream data chunk
         console.log('response chunk:', data);
         next();
     });
     pipe.on('response:end', (data, next) => {
-        // do something with response
+        // do something with end of response stream
         console.log('end of response stream');
         next();
     });
@@ -127,34 +159,7 @@ svr = app.listen();
 console.log('toorba service is listening on port:', port);
 ```
 
-#### Generic non-trooba service
-
-This version of service is for the sake of comparison
-
-```js
-var Grpc = require('grpc');
-var hello_proto = Grpc.load(require.resolve('./path/to/hello.proto'));
-
-/**
- * Implements the SayHello RPC method.
- */
-function sayHello(call, callback) {
-    callback(null, {message: 'Hello ' + call.request.name});
-}
-
-/**
- * Starts an RPC server that receives requests for the Greeter service at the
- * sample server port
- */
- var server = new Grpc.Server();
- server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
- server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
- server.start();
- console.log('listening on port:', port);
-
-```
-
 #### Advanced examples
 
 For more advanced examples, please take a look at [unit tests](test)
-You can also find an implementation of service sample router [here](test/fixtures/server) and invoking the service [here](test/fixtures/server.js)
+You can also find an implementation of simple service router [here](test/fixtures/server) and using the service [here](test/fixtures/server.js)
