@@ -348,8 +348,7 @@ describe(__filename, () => {
         var client = pipeClient.build('client:default');
         client.sayHelloAll();
 
-        svr.close(function (isForced) {
-            Assert.ok(isForced);
+        svr.close(function () {
             done();
         }, 1);
     });
