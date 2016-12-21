@@ -4,7 +4,7 @@ var Grpc = require('grpc');
 var hello_proto = Grpc.load(require.resolve('./hello.proto'));
 
 /**
- * Implements the SayHello RPC method.
+ * Implements stream/response call
  */
 function sayHello(call, callback) {
     var meta = new Grpc.Metadata();
@@ -23,11 +23,14 @@ function sayHello(call, callback) {
     });
 }
 
-function beGreeted(call, callback) {
+/**
+ * Implements request/stream call
+ */
+function beGreeted(call) {
     if (call.request.name === 'timeout') {
         return;
     }
-    
+
     var reply = 'Hello ' + call.request.name;
 
     if (call.request.name === 'massive') {
@@ -65,7 +68,10 @@ function beGreeted(call, callback) {
     call.end();
 }
 
-function sayHelloAll(call, callback) {
+/**
+ * Implements stream/stream call
+ */
+function sayHelloAll(call) {
     var meta = new Grpc.Metadata();
     meta.set('foo', 'bar');
     if (call.metadata.getMap().qaz) {

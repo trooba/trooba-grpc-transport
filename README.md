@@ -28,13 +28,14 @@ npm install trooba-grpc-transport --save
 #### Service invocation
 
 ```js
+var port = 50001;
 var grpcTransport = require('trooba-grpc-transport');
 
 require('trooba')
     .use(grpcTransport, {
         protocol: 'http:',
         hostname: 'grpc.service.my',
-        port: 50001,
+        port: port,
         proto: require.resolve('path/to/hello.proto'),
         connectTimeout: 100,
         socketTimeout: 1000
@@ -70,7 +71,65 @@ message HelloReply {
 
 ```
 
-#### Sample server
+#### Trooba based service
+
+```js
+var pipeServer = Trooba.use(transport, {
+    port: port,
+    hostname: 'localhost',
+    proto: Grpc.load(require.resolve('./path/to/hello.proto'))
+})
+.use(function handler(pipe) {
+    pipe.on('request', (request, next) => {
+        // do something with request
+        console.log('gRPC request metadata:', request.headers);
+        next();
+    });
+    pipe.on('request:data', (data, next) => {
+        // do something with request
+        console.log('request chunk:', data);
+        next();
+    });
+    pipe.on('request:end', (data, next) => {
+        // do something with request
+        console.log('end of request stream');
+        next();
+    });
+
+    pipe.on('response', (response, next) => {
+        // do something with response
+        console.log('gRPC response metadata:', response.headers);
+        next();
+    });
+    pipe.on('response:data', (data, next) => {
+        // do something with response
+        console.log('response chunk:', data);
+        next();
+    });
+    pipe.on('response:end', (data, next) => {
+        // do something with response
+        console.log('end of response stream');
+        next();
+    });
+})
+.use(function controller(pipe) {
+    // handle request/response here
+    pipe.on('request', request => {
+        pipe.respond({
+            body: 'Hello ' + request.body.name
+        });
+    });
+});
+
+var app = pipeServer.build('server:default');
+
+svr = app.listen();
+console.log('toorba service is listening on port:', port);
+```
+
+#### Generic non-trooba service
+
+This version of service is for the sake of comparison
 
 ```js
 var Grpc = require('grpc');
@@ -87,14 +146,15 @@ function sayHello(call, callback) {
  * Starts an RPC server that receives requests for the Greeter service at the
  * sample server port
  */
-module.exports.start = function start(port) {
-    var server = new Grpc.Server();
-    console.log('listening on port:', port);
-    server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
-    server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
-    server.start();
-    return server;
-};
+ var server = new Grpc.Server();
+ server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
+ server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
+ server.start();
+ console.log('listening on port:', port);
 
-module.exports.proto = hello_proto;
 ```
+
+#### Advanced examples
+
+For more advanced examples, please take a look at [unit tests](test)
+You can also find an implementation of service sample router [here](test/fixtures/server) and invoking the service [here](test/fixtures/server.js)
