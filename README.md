@@ -7,7 +7,7 @@
 
 gRPC transport for [trooba](https://github.com/trooba/trooba) pipeline.
 
-The module provides a *client* and *service* side gRPC transport implementation.
+The module provides a *client* and *service* side gRPC transport implementation for [trooba](https://github.com/trooba/trooba) pipeline.
 
 ## Get Involved
 
@@ -23,18 +23,51 @@ The module provides a *client* and *service* side gRPC transport implementation.
 npm install trooba-grpc-transport --save
 ```
 
+## Architecture
+
+The module exports service and client API which matches exactly the API provided by [gRPC](https://github.com/grpc/grpc/tree/master/src/node) module.
+
+Once request/response/data chunk enters the trooba pipeline, it assumes more generic API and request like data structures.
+
+Trooba framework does not dictate specific data structures that should be used for request/response/messages/stream objects. It assumes basic requirements and leaves everything else to the implementor of the transport.
+
+This transport goes further and defines some specifics for data it operates with:
+* Possible flows:
+  * request/response is a basic interaction between client and service
+  * request/stream is a flow where for a single request it results in response stream
+  * stream/response is a flow where for request stream the backend generates a single response
+  * stream/stream is a flow where for the request stream the backend generates a response stream
+* All the above flows use request and response object to initiate the flow and streaming uses arbitrary data chunks
+* Request object structure:
+  * **body** contains request data which is a message object in gRPC terms
+  * **headers** contains request headers that match gRPC metadata
+  * **path** matches gRPC package namespace and service name separated by '/'. For example:
+  ```
+  'foo.bar.v1.Hello.sayHello' => '/foo/bar/v1/Hello/sayHello'
+  ```
+* Response object structure:
+  * **body** contains response data which is a message object in gRPC terms
+  * **headers** contains response headers that match gRPC metadata
+  * **status** is gRPC status
+* Data chunk matches gRPC streaming data
+
+The client transport uses two timeouts:
+* connectTimeout sets the deadline for establishing the connection
+* socketTimeout sets the deadline for response or any further response chunk; whenever a new chunk is received the transport resets the socket timeout
+
 ## Usage
 
 #### Service invocation
 
 ```js
+var port = 50001;
 var grpcTransport = require('trooba-grpc-transport');
 
 require('trooba')
     .use(grpcTransport, {
         protocol: 'http:',
-        hostname: 'grpc.service.my',
-        port: 50001,
+        hostname: 'localhost',
+        port: port,
         proto: require.resolve('path/to/hello.proto'),
         connectTimeout: 100,
         socketTimeout: 1000
@@ -49,8 +82,6 @@ require('trooba')
 
 ```js
 syntax = "proto3";
-
-option java_package = "com.app.sample.grpc";
 
 // The hello service definition.
 service Hello {
@@ -70,31 +101,101 @@ message HelloReply {
 
 ```
 
-#### Sample server
+#### Trooba based service
 
 ```js
-var Grpc = require('grpc');
-var hello_proto = Grpc.load(require.resolve('./path/to/hello.proto'));
+var pipeServer = Trooba.use(transport, {
+    port: port,
+    hostname: 'localhost',
+    proto: Grpc.load(require.resolve('./path/to/hello.proto'))
+})
+.use(function handler(pipe) {
+    pipe.on('request', (request, next) => {
+        // do something with request
+        console.log('gRPC request metadata:', request.headers);
+        next();
+    });
+    pipe.on('request:data', (data, next) => {
+        // do something with request stream data chunk
+        console.log('request chunk:', data);
+        next();
+    });
+    pipe.on('request:end', (data, next) => {
+        // do something with stream end
+        console.log('end of request stream');
+        next();
+    });
 
-/**
- * Implements the SayHello RPC method.
- */
-function sayHello(call, callback) {
-    callback(null, {message: 'Hello ' + call.request.name});
-}
+    pipe.on('response', (response, next) => {
+        // do something with response
+        console.log('gRPC response metadata:', response.headers);
+        next();
+    });
+    pipe.on('response:data', (data, next) => {
+        // do something with response stream data chunk
+        console.log('response chunk:', data);
+        next();
+    });
+    pipe.on('response:end', (data, next) => {
+        // do something with end of response stream
+        console.log('end of response stream');
+        next();
+    });
+})
+.use(function controller(pipe) {
+    // handle request/response here
+    pipe.on('request', request => {
+        pipe.respond({
+            body: 'Hello ' + request.body.name
+        });
+    });
+});
 
-/**
- * Starts an RPC server that receives requests for the Greeter service at the
- * sample server port
- */
-module.exports.start = function start(port) {
-    var server = new Grpc.Server();
-    console.log('listening on port:', port);
-    server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
-    server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
-    server.start();
-    return server;
+var app = pipeServer.build('server:default');
+
+svr = app.listen();
+console.log('toorba service is listening on port:', port);
+```
+
+#### Advanced examples
+
+For more advanced examples, please take a look at [unit tests](test)
+You can also find an implementation of simple service router [here](test/fixtures/server) and using the service [here](test/fixtures/server.js)
+
+* Router example:
+
+```js
+module.exports = function routes() {
+    var router = Router.create();
+    router.use({
+        path: 'com/xyz/helloworld/Hello/sayHello',
+        handle: require('./sayHello')
+    });
+    router.use({
+        path: 'Hello/sayHello',
+        handle: require('./sayHello')
+    });
+    router.use({
+        path: 'Hello/sayHelloAll',
+        handle: require('./sayHelloAll')
+    });
+    router.use({
+        path: 'Hello/beGreeted',
+        handle: require('./beGreeted')
+    });
+
+    return router.build();
 };
+```
 
-module.exports.proto = hello_proto;
+* Service:
+
+```js
+var pipeServer = Trooba
+.use(transport, {
+    port: 40000,
+    hostname: 'localhost',
+    proto: Server.proto
+})
+.use(controller());
 ```

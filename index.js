@@ -1,51 +1,54 @@
 'use strict';
 
-var NodeUtils = require('util');
-var stream = require('stream');
-var Grpc = require('grpc');
-var Hoek = require('hoek');
-var _ = require('lodash');
+const NodeUtils = require('util');
+const stream = require('stream');
+const Grpc = require('grpc');
+const Hoek = require('hoek');
+const _ = require('lodash');
 
-var Readable = stream.Readable;
-var Writable = stream.Writable;
-var Duplex = stream.Duplex;
+const Readable = stream.Readable;
+const Writable = stream.Writable;
+const Duplex = stream.Duplex;
 
 function debug() {
     module.exports.debug.apply(null, arguments);
 }
+
+let endpoints = {};
+
 /**
  * Defines gRPC transport
 */
 module.exports = function grpcTransport(pipe, config) {
     debug('# grpc init');
-    // find a client and setup connection and error handling
-    var endpoint = config.hostname + ':' + config.port;
 
-    if (!config.$client) {
-        var proto = typeof proto === 'string' ?
-            Grpc.load(proto) : config.proto;
+    const proto = config.proto = typeof config.proto === 'string' ?
+        Grpc.load(config.proto) : config.proto;
+    let endpoint = config.hostname + ':' + config.port;
 
-        var serviceMethods = extractService(proto, config.serviceName);
-        debug('# resolved service', config.serviceName, ', methods:', serviceMethods);
+    pipe.set('client:default', clientApi);
+    pipe.set('server:default', serverApi);
 
-        debug('# connect: ', endpoint, config.credentials || '');
-        config.$client = new proto[config.serviceName](endpoint,
-            config.credentials || Grpc.credentials.createInsecure(),
-            config.options);
-    }
-
-    pipe.on('request', function onRequest(request) {
+    pipe.on('request', function onRequest(request, next) {
         debug('# request context', pipe.context, request);
-        var readTimeout;
 
-        var args = [];
+        if (pipe.context.service$) {
+            // for service flow skip
+            debug('# service request');
+            next();
+            return;
+        }
+
+        let readTimeout;
+
+        const args = [];
         if (!pipe.context.requestStream) {
             args.push(request.body);
         }
         if (request.headers) {
-            var meta = new Grpc.Metadata();
+            const meta = new Grpc.Metadata();
             Object.keys(request.headers).forEach(function forEach(name) {
-                meta.set(name, request.headers[name]);
+                meta.set(name, ''+request.headers[name]);
             });
             args.push(meta);
         }
@@ -55,7 +58,7 @@ module.exports = function grpcTransport(pipe, config) {
 
         debug('# waiting for connection', endpoint);
 
-        var waitForClientReady = process.domain ? process.domain.bind(waitForConnect) : waitForConnect;
+        const waitForClientReady = process.domain ? process.domain.bind(waitForConnect) : waitForConnect;
 
         Grpc.waitForClientReady(config.$client,
             Date.now() + (config.connectTimeout || 1000),
@@ -63,12 +66,12 @@ module.exports = function grpcTransport(pipe, config) {
 
         function waitForConnect(err) {
             debug('# done waiting for connection', endpoint);
-            var call;
-            var responseStatus;
-            var responseStream;
-            var startResponseStream;
+            let call;
+            let responseStatus;
+            let responseStream;
+            let startResponseStream;
 
-            var timedReply = function timedReply(err, data) {
+            let timedReply = function timedReply(err, data) {
                 if (readTimeout) {
                     clearTimeout(readTimeout);
                     readTimeout = undefined;
@@ -86,17 +89,17 @@ module.exports = function grpcTransport(pipe, config) {
                     }
                     // clear it
                     responseStatus = undefined;
+                    if (data) {
+                        data.body = data.message;
+                        delete data.message;
+                    }
                     if (pipe.context.responseStream) {
                         if (data) {
                             // set new response timeout for the next chunk if not the end of stream
                             debug('# setting up timeout for the next chunk');
                             setupReadTimeout(call);
                         }
-                        if (data) {
-                            data.body = data.message;
-                            delete data.message;
-                        }
-                        responseStream.write(data);
+                        responseStream.write(data ? data.body : null);
                     }
                     else {
                         pipe.respond(data);
@@ -186,11 +189,7 @@ module.exports = function grpcTransport(pipe, config) {
             }
 
             function setupReadTimeout(emitter) {
-                if (readTimeout) {
-                    debug('# clearing current response timeout');
-                    clearTimeout(readTimeout);
-                }
-                var responseTimeout = config.socketTimeout || 1000;
+                const responseTimeout = config.socketTimeout || 1000;
                 debug('# setting up response timeout', responseTimeout);
 
                 readTimeout = setTimeout(function _readTimeout() {
@@ -208,28 +207,170 @@ module.exports = function grpcTransport(pipe, config) {
         }
     });
 
-    pipe.set('client:default', api);
+    function serverApi(pipe) {
+        const credentials = config.serverCredentials || Grpc.ServerCredentials.createInsecure();
 
-    function api(pipe) {
+        const server = new Grpc.Server();
+        config.port = server.bind(endpoint, credentials);
+        endpoint = config.hostname + ':' + config.port;
 
-        function genericRequest(operation, message, callback) {
-            var args = [].slice.call(arguments);
+        const services = selectServices(proto);
+        pipe.context.service$ = true;
+        const genericRequest = createGenericHandler(pipe);
+
+        Object.keys(services).forEach(serviceName => {
+            const methods = services[serviceName];
+
+            let routes = methods.reduce((memo, methodMeta) => {
+                var methodName = methodMeta.name;
+                methodMeta.service = serviceName;
+                methodMeta.name = methodName.charAt(0).toLowerCase() + methodName.slice(1);
+                memo[methodMeta.name] = request$.bind(memo, methodMeta);
+                return memo;
+            }, {});
+
+            debug('# service %s routes:', serviceName, routes);
+            server.addProtoService(_.get(proto, serviceName).service, routes);
+        });
+
+        return {
+            listen: (callback) => {
+                if (endpoint && endpoints[endpoint]) {
+                    let err = new Error('The service is already running:' + endpoint);
+                    if (callback) {
+                        return callback(err);
+                    }
+                    throw err;
+                }
+                endpoints[endpoint] = server;
+
+                server.start();
+                callback && setImmediate(callback);
+                return {
+                    port: config.port,
+                    close: (cb, timeout) => {
+                        const cleanup = Hoek.once(() => {
+                            delete endpoints[endpoint];
+                            cb();
+                        });
+                        server.tryShutdown(cleanup);
+                        setTimeout(() => {
+                            debug('# forced shutdown');
+                            server.forceShutdown();
+                            cleanup();
+                        }, timeout || 1000);
+                    }
+                };
+            }
+        };
+
+        function request$(operation, call, callback) {
+
+            const session = genericRequest(operation,
+                call.request, call.metadata.getMap());
+
+            if (operation.responseStream) {
+                session.pipe(call);
+            }
+            else {
+                session
+                .on('error', err => {
+                    return callback(err);
+                })
+                .on('response', response => {
+                    sendMetadata(response.headers);
+                    callback(null, {
+                        message: response.body
+                    });
+                });
+            }
+
+            if (operation.requestStream) {
+                call.pipe(session);
+            }
+
+            if (operation.responseStream) {
+                session.once('response', function onResponse(response) {
+                    response && response.headers && sendMetadata(response.headers);
+                });
+                return new ClientReadableStream(pipe);
+            }
+
+            function sendMetadata(headers) {
+                if (headers) {
+                    const keys = Object.keys(headers);
+                    if (keys.length) {
+                        const meta = new Grpc.Metadata();
+                        keys.forEach(name => {
+                            meta.set(name, headers[name]);
+                        });
+                        call.sendMetadata(meta);
+                    }
+                }
+            }
+
+        }
+
+    }
+
+    function clientApi(pipe) {
+        const credentials = config.credentials || Grpc.credentials.createInsecure();
+        pipe.context.client$ = true;
+
+        if (!config.$client) {
+            debug('# connect: ', endpoint, config.credentials || '');
+            config.$client = new proto[config.serviceName](endpoint, credentials, config.options);
+        }
+
+        const service = extractService(proto, config.serviceName);
+        debug('# resolved service', service.name, ', methods:', service.methods);
+
+        const client = service.methods.reduce(function reduce(memo, methodMeta) {
+            methodMeta = Object.create(methodMeta);
+
+            const methodName = methodMeta.name;
+            methodMeta.service = service.name;
+            methodMeta.name = methodName.charAt(0).toLowerCase() + methodName.slice(1);
+            memo[methodMeta.name] = memo.request$.bind(memo, methodMeta);
+
+            return memo;
+        }, {
+            // generic API
+            request$: createGenericHandler(pipe)
+        });
+
+        return client;
+    }
+
+    function createGenericHandler(pipe) {
+        return function genericRequest(operation, message, metadata, callback) {
+
+            const args = [].slice.call(arguments);
             operation = args.shift();
             callback = operation.responseStream ? undefined : args.pop();
             message = args.shift();
-
+            metadata = args.shift();
+            if (typeof callback !== 'function') {
+                metadata = callback;
+                callback = undefined;
+            }
             debug('# pipe for', operation.name, message);
 
-            var requestMethod = operation.requestStream ? 'streamRequest' : 'request';
+            const requestMethod = operation.requestStream ? 'streamRequest' : 'request';
 
             pipe = pipe.create({
                 requestStream: !!operation.requestStream,
                 responseStream: !!operation.responseStream,
-                operation: operation.name
+                operation: operation.name,
             });
 
+            var servicePath = operation.service ?
+                [operation.service.replace(/\./g, '/'), operation.name].join('/') :
+                operation.name;
             pipe[requestMethod]({
-                body: message
+                body: message,
+                headers: metadata,
+                path: servicePath
             });
 
             if (operation.responseStream && operation.requestStream) {
@@ -240,42 +381,35 @@ module.exports = function grpcTransport(pipe, config) {
                 return new ClientReadableStream(pipe);
             }
             else {
-                pipe
-                .once('response', function onResponse(response) {
-                    callback(null, response.message);
-                })
-                .once('error', callback);
+                if (callback) {
+                    pipe
+                    .once('response', function onResponse(response) {
+                        callback(null, response.body);
+                    })
+                    .once('error', callback);
+                }
             }
 
             if (operation.requestStream) {
                 return new ClientWritableStream(pipe);
             }
+            else {
+                return pipe;
+            }
 
-        }
-
-        var client = serviceMethods.reduce(function reduce(memo, methodMeta) {
-            var methodName = methodMeta.name;
-            methodMeta.name = methodName.charAt(0).toLowerCase() + methodName.slice(1);
-            memo[methodMeta.name] = memo.request$.bind(memo, methodMeta);
-            return memo;
-        }, {
-            // generic API
-            request$: genericRequest
-        });
-
-        return client;
+        };
     }
 };
 
 function extractService(proto, serviceName) {
-    var services = selectServices(proto);
-    var servicesNumber = Object.keys(services).length;
+    const services = selectServices(proto);
+    const servicesNumber = Object.keys(services).length;
     if (servicesNumber === 0) {
         throw new Error('Failed to detect services in proto: ' +
             NodeUtils.inspect(proto, ' ', 1));
     }
 
-    var service;
+    let service;
     if (servicesNumber > 1) {
         if (!serviceName) {
             throw new Error('Service name should be provided in multi-service proto: ' + NodeUtils.inspect(proto, ' ', 1));
@@ -286,10 +420,14 @@ function extractService(proto, serviceName) {
         }
     }
     else {
-        service = services[Object.keys(services)[0]];
+        serviceName = Object.keys(services)[0];
+        service = services[serviceName];
     }
 
-    return service;
+    return {
+        name: serviceName,
+        methods: service
+    };
 }
 
 function selectMethods(serviceMeta) {
@@ -306,11 +444,11 @@ function selectServices(proto, base, collection) {
     collection = collection || {};
     base = base || [];
     Object.keys(proto).forEach(function forEach(name) {
-        var path = base.slice();
+        const path = base.slice();
         path.push(name);
-        var member = proto[name];
+        const member = proto[name];
         if (member.service) {
-            var serviceName = path.join('.');
+            const serviceName = path.join('.');
             collection[serviceName] = selectMethods(member);
         }
         else if (typeof member === 'object') {
@@ -327,21 +465,26 @@ function selectServices(proto, base, collection) {
 function ClientWritableStream(pipe) {
     Writable.call(this, {objectMode: true});
     this._init(pipe);
+    this.$pipe = pipe;
+    hookPipeEventsToStream(pipe, this);
 }
 
 NodeUtils.inherits(ClientWritableStream, Writable);
 
 function _initWrite(pipe) {
     /*jshint validthis:true */
-    var self = this;
+    if (pipe.context.client$) {
+        pipe.on('connection', () => {
+            this._requestStream = pipe.context.$requestStream;
+            this._resume && this._requestStream.write(this._resume.message);
+            this._resume && this._resume.done();
+        });
+    }
+    else {
+        this._requestStream = pipe.context.$requestStream;
+    }
 
-    pipe.on('connection', function onConnection() {
-        self._requestStream = pipe.context.$requestStream;
-        self._resume && self._requestStream.write(self._resume.message);
-        self._resume && self._resume.done();
-    });
-
-    self.on('finish', function onStreamFinish() {
+    this.on('finish', () => {
         this._requestStream.end();
     });
 }
@@ -369,27 +512,36 @@ function ClientReadableStream(pipe) {
     Readable.call(this, {objectMode: true});
 
     this._init(pipe);
+    this.$pipe = pipe;
+    hookPipeEventsToStream(pipe, this);
 }
 
 NodeUtils.inherits(ClientReadableStream, Readable);
 
+function hookPipeEventsToStream(pipe, stream) {
+    pipe.on('*', message => {
+        stream.emit(message.type, message.ref);
+    });
+}
+
 function _initRead(pipe) {
     /*jshint validthis:true */
-    var self = this;
-    self._responseBuffer = [];
+    this._responseBuffer = [];
 
-    pipe.on('response:data', function onData(data) {
-        if (self._paused) {
-            self._responseBuffer.push(data ? data.body : null);
+    pipe.on('response:data', data => {
+        if (this._paused) {
+            this._responseBuffer.push(data);
             return;
         }
         // TODO: need to send signal back to the write side when then need to pause
         // and drain even on ready, for now use buffer
-        self._paused = !self.push(data === undefined ? null : data.body);
+        debug('# reading response data', data);
+        this._paused = !this.push(data || null);
     });
 
-    pipe.on('error', function onErr(err) {
-        self.emit('error', err);
+    pipe.on('error', err => {
+        debug('# reading response error', err);
+        this.emit('error', err);
     });
 }
 
@@ -411,6 +563,8 @@ function ClientDuplexStream(pipe) {
     Duplex.call(this, {objectMode: true});
     this._initWrite(pipe);
     this._initRead(pipe);
+    this.$pipe = pipe;
+    hookPipeEventsToStream(pipe, this);
 }
 
 NodeUtils.inherits(ClientDuplexStream, Duplex);
