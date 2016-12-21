@@ -28,6 +28,7 @@ module.exports = function grpcTransport(pipe, config) {
 
     pipe.set('client:default', clientApi);
     pipe.set('server:default', serverApi);
+    pipe.set('service:default', serverApi);
 
     pipe.on('request', function onRequest(request, next) {
         debug('# request context', pipe.context, request);
