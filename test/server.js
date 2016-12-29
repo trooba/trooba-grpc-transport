@@ -24,7 +24,7 @@ describe(__filename, () => {
         })
         .use(routes());
 
-        var app = pipeServer.build('server:default');
+        var app = pipeServer.build().create('server:default');
 
         svr = app.listen();
         Assert.ok(svr.port);
@@ -35,7 +35,7 @@ describe(__filename, () => {
             proto: Server.proto,
             serviceName: 'Hello'
         });
-        var client = pipeClient.build('client:default');
+        var client = pipeClient.build().create('client:default');
 
         client.sayHello('John', function (err, response) {
             Assert.ok(!err, err && err.stack);
@@ -54,7 +54,7 @@ describe(__filename, () => {
         })
         .use(routes());
 
-        var app = pipeServer.build('server:default');
+        var app = pipeServer.build().create('server:default');
 
         svr = app.listen();
         Assert.ok(svr.port);
@@ -65,7 +65,7 @@ describe(__filename, () => {
             proto: Server.proto,
             serviceName: 'Hello'
         });
-        var client = pipeClient.build('client:default');
+        var client = pipeClient.build().create('client:default');
 
         client.sayHello('error', function (err, response) {
             Assert.ok(err);
@@ -84,7 +84,7 @@ describe(__filename, () => {
         })
         .use(routes());
 
-        var app = pipeServer.build('server:default');
+        var app = pipeServer.build().create('server:default');
 
         svr = app.listen();
         Assert.ok(svr.port);
@@ -103,7 +103,7 @@ describe(__filename, () => {
             proto: Server.proto,
             serviceName: 'Hello'
         });
-        var client = pipeClient.build('client:default');
+        var client = pipeClient.build().create('client:default');
 
         client.sayHello('John', {
             meta: true,
@@ -128,7 +128,7 @@ describe(__filename, () => {
         })
         .use(routes());
 
-        var app = pipeServer.build('server:default');
+        var app = pipeServer.build().create('server:default');
 
         svr = app.listen();
         Assert.ok(svr.port);
@@ -139,7 +139,7 @@ describe(__filename, () => {
             proto: Server.proto.com.xyz.helloworld,
             serviceName: 'Hello'
         });
-        var client = pipeClient.build('client:default');
+        var client = pipeClient.build().create('client:default');
 
         client.sayHello('John', function (err, response) {
             Assert.ok(!err, err && err.stack);
@@ -158,7 +158,7 @@ describe(__filename, () => {
         })
         .use(routes());
 
-        var app = pipeServer.build('server:default');
+        var app = pipeServer.build().create('server:default');
 
         svr = app.listen();
         Assert.ok(svr.port);
@@ -169,7 +169,7 @@ describe(__filename, () => {
             proto: Server.proto,
             serviceName: 'Hello'
         });
-        var client = pipeClient.build('client:default');
+        var client = pipeClient.build().create('client:default');
 
         var messageCount = 0;
         var call = client.beGreeted('Jack');
@@ -203,7 +203,8 @@ describe(__filename, () => {
         })
         .use(function routes(pipe) {
             var names = [];
-            pipe.on('request', function onData(request) {
+            pipe.on('request', function onData(request, next) {
+                next();
             });
             pipe.on('request:data', function onData(data, next) {
                 data && names.push(data.name);
@@ -216,7 +217,7 @@ describe(__filename, () => {
             });
         });
 
-        var app = pipeServer.build('server:default');
+        var app = pipeServer.build().create('server:default');
 
         svr = app.listen();
         Assert.ok(svr.port);
@@ -227,7 +228,7 @@ describe(__filename, () => {
             proto: Server.proto,
             serviceName: 'Hello'
         });
-        var client = pipeClient.build('client:default');
+        var client = pipeClient.build().create('client:default');
 
         var call = client.sayHello(function (err, response) {
             // getting reponse
@@ -256,7 +257,7 @@ describe(__filename, () => {
         })
         .use(routes());
 
-        var app = pipeServer.build('server:default');
+        var app = pipeServer.build().create('server:default');
 
         svr = app.listen();
         Assert.ok(svr.port);
@@ -267,7 +268,7 @@ describe(__filename, () => {
             proto: Server.proto,
             serviceName: 'Hello'
         });
-        var client = pipeClient.build('client:default');
+        var client = pipeClient.build().create('client:default');
 
         let messageCount = 0;
 
@@ -311,7 +312,7 @@ describe(__filename, () => {
         })
         .use(routes());
 
-        var app = pipeServer.build('server:default');
+        var app = pipeServer.build().create('server:default');
 
         svr = app.listen();
 
@@ -335,7 +336,7 @@ describe(__filename, () => {
         })
         .use(routes());
 
-        var app = pipeServer.build('server:default');
+        var app = pipeServer.build().create('server:default');
 
         svr = app.listen();
 
@@ -345,7 +346,7 @@ describe(__filename, () => {
             proto: Server.proto,
             serviceName: 'Hello'
         });
-        var client = pipeClient.build('client:default');
+        var client = pipeClient.build().create('client:default');
         client.sayHelloAll();
 
         svr.close(function () {
