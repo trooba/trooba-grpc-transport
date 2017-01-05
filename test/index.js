@@ -1083,7 +1083,7 @@ describe(__filename, function () {
             connectTimeout: 2000
         }).build().create('client:default');
 
-        var MAX = 5000;
+        var MAX = 1000;
         var names = [];
         var paused = false;
         var drained = false;
