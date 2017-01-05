@@ -23,38 +23,6 @@ The module provides a *client* and *service* side gRPC transport implementation 
 npm install trooba-grpc-transport --save
 ```
 
-## Architecture
-
-The module exports service and client API which matches exactly the API provided by [gRPC](https://github.com/grpc/grpc/tree/master/src/node) module.
-
-Once request/response/data chunk enters the trooba pipeline, it assumes more generic API and request like data structures.
-
-Trooba framework does not dictate specific data structures that should be used for request/response/messages/stream objects. It assumes basic requirements and leaves everything else to the implementor of the transport.
-
-This transport goes further and defines some specifics for data it operates with:
-* Possible flows:
-  * request/response is a basic interaction between client and service
-  * request/stream is a flow where for a single request it results in response stream
-  * stream/response is a flow where for request stream the backend generates a single response
-  * stream/stream is a flow where for the request stream the backend generates a response stream
-* All the above flows use request and response object to initiate the flow and streaming uses arbitrary data chunks
-* Request object structure:
-  * **body** contains request data which is a message object in gRPC terms
-  * **headers** contains request headers that match gRPC metadata
-  * **path** matches gRPC package namespace and service name separated by '/'. For example:
-  ```
-  'foo.bar.v1.Hello.sayHello' => '/foo/bar/v1/Hello/sayHello'
-  ```
-* Response object structure:
-  * **body** contains response data which is a message object in gRPC terms
-  * **headers** contains response headers that match gRPC metadata
-  * **status** is gRPC status
-* Data chunk matches gRPC streaming data
-
-The client transport uses two timeouts:
-* connectTimeout sets the deadline for establishing the connection
-* socketTimeout sets the deadline for response or any further response chunk; whenever a new chunk is received the transport resets the socket timeout
-
 ## Usage
 
 #### Service invocation
@@ -156,6 +124,38 @@ var app = pipeServer.build('server:default');
 svr = app.listen();
 console.log('toorba service is listening on port:', port);
 ```
+
+## Architecture
+
+The module exports service and client API which matches exactly the API provided by [gRPC](https://github.com/grpc/grpc/tree/master/src/node) module.
+
+Once request/response/data chunk enters the trooba pipeline, it assumes more generic API and request like data structures.
+
+Trooba framework does not dictate specific data structures that should be used for request/response/messages/stream objects. It assumes basic requirements and leaves everything else to the implementor of the transport.
+
+This transport goes further and defines some specifics for data it operates with:
+* Possible flows:
+  * request/response is a basic interaction between client and service
+  * request/stream is a flow where for a single request it results in response stream
+  * stream/response is a flow where for request stream the backend generates a single response
+  * stream/stream is a flow where for the request stream the backend generates a response stream
+* All the above flows use request and response object to initiate the flow and streaming uses arbitrary data chunks
+* Request object structure:
+  * **body** contains request data which is a message object in gRPC terms
+  * **headers** contains request headers that match gRPC metadata
+  * **path** matches gRPC package namespace and service name separated by '/'. For example:
+  ```
+  'foo.bar.v1.Hello.sayHello' => '/foo/bar/v1/Hello/sayHello'
+  ```
+* Response object structure:
+  * **body** contains response data which is a message object in gRPC terms
+  * **headers** contains response headers that match gRPC metadata
+  * **status** is gRPC status
+* Data chunk matches gRPC streaming data
+
+The client transport uses two timeouts:
+* connectTimeout sets the deadline for establishing the connection
+* socketTimeout sets the deadline for response or any further response chunk; whenever a new chunk is received the transport resets the socket timeout
 
 #### Advanced examples
 
