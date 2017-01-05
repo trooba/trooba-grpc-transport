@@ -699,14 +699,13 @@ describe(__filename, function () {
         it('should handle connect timeout, request/response', function (done) {
             var Server = require('./fixtures/hello-timeout/server');
             var port = portCounter++;
-            server = Server.start(port);
 
             var client = Trooba.use(grpcTransport, {
                 port: port,
                 hostname: 'localhost',
                 proto: Server.proto,
                 serviceName: 'Hello',
-                connectTimeout: 1
+                connectTimeout: 10
             }).build().create('client:default');
 
             client.request$({
