@@ -30,7 +30,7 @@ module.exports.start = function start(port) {
     var server = new Grpc.Server();
     console.log('listening on port:', port);
     server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
-    server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
+    server.addService(hello_proto.Hello.service, {sayHello: sayHello});
     server.start();
     lastServer = server;
     return server;
@@ -47,7 +47,7 @@ module.exports.startSsl = function start(port) {
         }],
         false
     ));
-    server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
+    server.addService(hello_proto.Hello.service, {sayHello: sayHello});
     server.start();
     return server;
 };

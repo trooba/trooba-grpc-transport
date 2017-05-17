@@ -12,7 +12,7 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'SayHello',
+                    name: 'sayHello',
                     requestStream: false,
                     responseStream: false
                 }
@@ -24,7 +24,7 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'SayHello',
+                    name: 'sayHello',
                     requestStream: false,
                     responseStream: false
                 }
@@ -39,12 +39,12 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'SayHello',
+                    name: 'sayHello',
                     requestStream: false,
                     responseStream: false
                 },
                 {
-                    name: 'SayHi',
+                    name: 'sayHi',
                     requestStream: false,
                     responseStream: false
                 }
@@ -56,12 +56,12 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'SayHello',
+                    name: 'sayHello',
                     requestStream: false,
                     responseStream: false
                 },
                 {
-                    name: 'SayHi',
+                    name: 'sayHi',
                     requestStream: false,
                     responseStream: false
                 }
@@ -80,7 +80,7 @@ describe(__filename, function () {
         Assert.deepEqual({
             name: 'Hello',
             methods: [{
-                name: 'SayHello',
+                name: 'sayHello',
                 requestStream: false,
                 responseStream: false
             }]
@@ -90,7 +90,7 @@ describe(__filename, function () {
         Assert.deepEqual({
             name: 'Hi',
             methods: [{
-                name: 'SayHi',
+                name: 'sayHi',
                 requestStream: false,
                 responseStream: false
             }]
@@ -104,17 +104,17 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'SayHello',
+                    name: 'sayHello',
                     requestStream: true,
                     responseStream: false
                 },
                 {
-                    name: 'BeGreeted',
+                    name: 'beGreeted',
                     requestStream: false,
                     responseStream: true
                 },
                 {
-                    name: 'SayHelloAll',
+                    name: 'sayHelloAll',
                     requestStream: true,
                     responseStream: true
                 },

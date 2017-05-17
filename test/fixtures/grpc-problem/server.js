@@ -4,14 +4,22 @@ var Grpc = require('grpc');
 var hello_proto = Grpc.load(require.resolve('./hello.proto'));
 
 /**
- * Implements the SayHello RPC method.
+ * Implements stream/stream call
  */
-function sayHello(call, callback) {
-    callback(null, {message: 'Hello ' + call.request.name});
-}
+function sayHelloAll(call) {
+    var meta = new Grpc.Metadata();
+    meta.set('foo', 'bar');
+    if (call.metadata.getMap().qaz) {
+        meta.set('rfv', call.metadata.getMap().qaz);
+    }
+    call.sendMetadata(meta);
 
-function sayHi(call, callback) {
-    callback(null, {message: 'Hi ' + call.request.name});
+    call.on('data', function onData(message) {
+        call.write('Hello ' + message.name);
+    });
+    call.on('end', function () {
+        call.end();
+    });
 }
 /**
  * Starts an RPC server that receives requests for the Greeter service at the
@@ -22,8 +30,7 @@ module.exports.start = function start(port) {
     console.log('listening on port:', port);
     server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
     server.addService(hello_proto.Hello.service, {
-        sayHello: sayHello,
-        sayHi: sayHi
+        sayHelloAll: sayHelloAll
     });
     server.start();
     return server;
