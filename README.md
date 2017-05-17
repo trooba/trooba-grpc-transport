@@ -3,7 +3,7 @@
 [![codecov](https://codecov.io/gh/trooba/trooba-grpc-transport/branch/master/graph/badge.svg)](https://codecov.io/gh/trooba/trooba-grpc-transport)
 [![Build Status](https://travis-ci.org/trooba/trooba-grpc-transport.svg?branch=master)](https://travis-ci.org/trooba/trooba-grpc-transport) [![NPM](https://img.shields.io/npm/v/trooba-grpc-transport.svg)](https://www.npmjs.com/package/trooba-grpc-transport)
 [![Downloads](https://img.shields.io/npm/dm/trooba-grpc-transport.svg)](http://npm-stat.com/charts.html?package=trooba-grpc-transport)
-[![Known Vulnerabilities](https://snyk.io/test/github/trooba/trooba/badge.svg)](https://snyk.io/test/github/trooba/trooba-grpc-transport)
+[![Known Vulnerabilities](https://snyk.io/test/github/trooba/trooba-grpc-transport/badge.svg)](https://snyk.io/test/github/trooba/trooba-grpc-transport)
 
 gRPC transport for [trooba](https://github.com/trooba/trooba) pipeline.
 
