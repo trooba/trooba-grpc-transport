@@ -12,7 +12,7 @@ describe(__filename, function () {
     var portCounter = 50000;
 
     afterEach(function () {
-        server && server.forceShutdown();
+        // server && server.forceShutdown();
     });
 
     it('should expose proto API', function (done) {
@@ -1186,7 +1186,7 @@ describe(__filename, function () {
     describe('parallel', function () {
         it('should handle request/response flow', function (done) {
             var Server = require('./fixtures/hello/server');
-
+            var MAX = 1000;
             var port = portCounter++;
             server = Server.start(port);
 
@@ -1198,12 +1198,11 @@ describe(__filename, function () {
             }).build().create('client:default');
 
             var count = 0;
-
-            Async.times(1000, function (n, next) {
+            Async.times(MAX, function (n, next) {
                 sayHello(n, next);
             }, function (err) {
                 Assert.ok(!err);
-                Assert.equal(1000, count);
+                Assert.equal(MAX, count);
                 done();
             });
 
