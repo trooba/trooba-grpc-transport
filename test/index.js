@@ -12,7 +12,7 @@ describe(__filename, function () {
     var portCounter = 50000;
 
     afterEach(function () {
-        // server && server.forceShutdown();
+        server && server.forceShutdown();
     });
 
     it('should expose proto API', function (done) {
