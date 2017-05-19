@@ -76,6 +76,10 @@ describe(__filename, function () {
             Utils.extractService(proto);
         }, /Service name should be provided in multi-service proto: { HelloRequest/);
 
+        Assert.throws(function () {
+            Utils.extractService(proto, 'doesNotExists');
+        }, /Cannot detect required service doesNotExists among {"Hello"/);
+
         var service = Utils.extractService(proto, 'Hello');
         Assert.deepEqual({
             name: 'Hello',
