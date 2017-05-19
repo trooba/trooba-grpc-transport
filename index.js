@@ -1,7 +1,6 @@
 'use strict';
 
 const NodeUtils = require('util');
-const stream = require('stream');
 const Grpc = require('grpc');
 const Hoek = require('hoek');
 const _ = require('lodash');
@@ -145,14 +144,12 @@ module.exports = function grpcTransport(pipe, config) {
                 // delay the data is buffered at this point till next is called
                 setImmediate(next);
 
-                pipe.on('request:data', function onRequestData(data, next) {
-                    debug('# request data:', data);
-                    if (data === undefined) {
-                        call.end();
-                        return;
-                    }
-                    call.write(data);
-                    next();
+                pipe.on('request:data', onRequestData);
+
+                call.once('error', err => {
+                    // FIX SIGSEGV (Address boundary error) due to diconnect connection
+                    // to prevent writing
+                    pipe.removeListener('request:data', onRequestData);
                 });
             }
 
@@ -196,6 +193,16 @@ module.exports = function grpcTransport(pipe, config) {
                 });
             }
 
+            function onRequestData(data, next) {
+                debug('# request data:', data);
+                if (data === undefined) {
+                    call.end();
+                    return;
+                }
+                call.write(data);
+                next();
+            }
+
             function setupReadTimeout(emitter) {
                 const responseTimeout = config.socketTimeout;
 
@@ -232,15 +239,13 @@ module.exports = function grpcTransport(pipe, config) {
             const methods = services[serviceName];
 
             let routes = methods.reduce((memo, methodMeta) => {
-                var methodName = methodMeta.name;
                 methodMeta.service = serviceName;
-                methodMeta.name = methodName.charAt(0).toLowerCase() + methodName.slice(1);
                 memo[methodMeta.name] = request$.bind(memo, methodMeta);
                 return memo;
             }, {});
 
             debug('# service %s routes:', serviceName, routes);
-            server.addProtoService(_.get(proto, serviceName).service, routes);
+            server.addService(_.get(proto, serviceName).service, routes);
         });
 
         return {
@@ -441,11 +446,13 @@ function extractService(proto, serviceName) {
 }
 
 function selectMethods(serviceMeta) {
-    return serviceMeta.service.children.map(function map(child) {
+    const methods = Object.keys(serviceMeta.service);
+    return methods.map(function map(name) {
+        const methodAttrs = serviceMeta.service[name];
         return {
-            name: child.name,
-            requestStream: child.requestStream,
-            responseStream: child.responseStream
+            name: name,
+            requestStream: methodAttrs.requestStream,
+            responseStream: methodAttrs.responseStream
         };
     });
 }

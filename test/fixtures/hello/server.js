@@ -18,8 +18,8 @@ function sayHello(call, callback) {
     if (call.metadata.getMap().qaz) {
         meta.set('rfv', call.metadata.getMap().qaz);
     }
-    call.sendMetadata(meta);
-    callback(null, {message: 'Hello ' + call.request.name});
+    // call.sendMetadata(meta);  // <<< this fails in linux/ubuntu
+    callback(null, {message: 'Hello ' + call.request.name}, meta);
 }
 
 /**
@@ -30,7 +30,7 @@ module.exports.start = function start(port) {
     var server = new Grpc.Server();
     console.log('listening on port:', port);
     server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
-    server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
+    server.addService(hello_proto.Hello.service, {sayHello: sayHello});
     server.start();
     lastServer = server;
     return server;
@@ -47,7 +47,7 @@ module.exports.startSsl = function start(port) {
         }],
         false
     ));
-    server.addProtoService(hello_proto.Hello.service, {sayHello: sayHello});
+    server.addService(hello_proto.Hello.service, {sayHello: sayHello});
     server.start();
     return server;
 };

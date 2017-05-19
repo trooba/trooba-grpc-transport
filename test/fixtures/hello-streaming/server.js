@@ -94,7 +94,7 @@ module.exports.start = function start(port) {
     var server = new Grpc.Server();
     console.log('listening on port:', port);
     server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
-    server.addProtoService(hello_proto.Hello.service, {
+    server.addService(hello_proto.Hello.service, {
         sayHello: sayHello,
         beGreeted: beGreeted,
         sayHelloAll: sayHelloAll

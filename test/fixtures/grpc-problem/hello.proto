@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+option java_package = "com.app.sample.grpc";
+
+// The hello service definition.
+service Hello {
+    // Sends a greeting
+    rpc SayHelloAll (stream HelloRequest) returns (stream HelloReply) {}
+}
+
+// The request message containing the user's name.
+message HelloRequest {
+    string name = 1;
+}
+
+// The response message containing the greetings
+message HelloReply {
+    string message = 1;
+}
