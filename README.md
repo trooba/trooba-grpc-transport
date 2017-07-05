@@ -160,7 +160,7 @@ The client transport uses two timeouts:
 #### Advanced examples
 
 For more advanced examples, please take a look at [unit tests](test)
-You can also find an implementation of simple service router [here](test/fixtures/server) and using the service [here](test/fixtures/server.js)
+You can also find an implementation of simple service router [here](test/fixtures/server).
 
 * Router example:
 
@@ -198,4 +198,12 @@ var pipeServer = Trooba
     proto: Server.proto
 })
 .use(routes());
+
+// create an app
+var app = pipeServer.build().create('server:default');
+
+// start it
+app.listen(() => {
+    console.log('The server is ready');
+});
 ```
