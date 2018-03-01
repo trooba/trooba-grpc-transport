@@ -2,7 +2,9 @@
 
 module.exports = function (request, pipe) {
     if (request.body.name === 'error') {
-        return pipe.throw(new Error('Test Error'));
+        const err = new Error('Test Error');
+        err.code = 10;
+        return pipe.throw(err);
     }
     var response = {
         body: 'Hello ' + request.body.name
