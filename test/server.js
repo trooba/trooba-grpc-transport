@@ -69,7 +69,7 @@ describe(__filename, () => {
 
         client.sayHello('error', function (err, response) {
             Assert.ok(err);
-            Assert.equal('10 ABORTED: Test Error', err.message);
+            Assert.equal('Test Error', err.message);
             done();
         });
     });
