@@ -34,7 +34,7 @@
     "async": "^2.1.2",
     "istanbul": "^0.4.5",
     "mocha": "^5.0.1",
-    "path-to-regexp": "^2.0.0",
+    "path-to-regexp": "^6.1.0",
     "trooba": "^2"
   },
   "dependencies": {
