@@ -1054,7 +1054,9 @@ describe(__filename, function () {
                         Assert.equal(1, errorCount);
                         done();
                     })
-                    .on('error', done);
+                    .on('error', err => {
+                        done(err);
+                    });
 
                     call.write('John');
                     call.write('Bob');
