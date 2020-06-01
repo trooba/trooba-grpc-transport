@@ -74,7 +74,7 @@ describe(__filename, function () {
 
         Assert.throws(function () {
             Utils.extractService(proto);
-        }, /Service name should be provided in multi-service proto: { HelloRequest/);
+        }, /Service name should be provided in multi-service proto: {[\s\n]*HelloRequest/);
 
         Assert.throws(function () {
             Utils.extractService(proto, 'doesNotExists');
@@ -132,7 +132,7 @@ describe(__filename, function () {
 
         Assert.throws(function () {
             Utils.extractService(proto);
-        }, /Failed to detect services in proto: { HelloRequest/);
+        }, /Failed to detect services in proto: {[\s\n]*HelloRequest/);
     });
 
 });
