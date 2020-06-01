@@ -7,3 +7,4 @@ test
 .cache
 .git
 yarn.lock
+coverage
