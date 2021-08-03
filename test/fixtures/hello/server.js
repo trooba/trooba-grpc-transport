@@ -60,11 +60,11 @@ module.exports.clientCredentials = Grpc.credentials.createSsl(
     Fs.readFileSync(require.resolve('./certs/client.crt'))
 );
 
-module.exports.clientRaptorCredentials = Grpc.credentials.createSsl(
-    Fs.readFileSync(require.resolve('./certs/raptor.pem')),
-    Fs.readFileSync(require.resolve('./certs/client.key')),
-    Fs.readFileSync(require.resolve('./certs/client.crt'))
-);
+// module.exports.clientRaptorCredentials = Grpc.credentials.createSsl(
+//     Fs.readFileSync(require.resolve('./certs/provide real pem')),
+//     Fs.readFileSync(require.resolve('./certs/client.key')),
+//     Fs.readFileSync(require.resolve('./certs/client.crt'))
+// );
 
 // module.exports.clientCredentials = Grpc.credentials.createSsl(
 //     Fs.readFileSync(require.resolve('./certs/grpc-client.key')),
