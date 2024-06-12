@@ -1,8 +1,9 @@
 'use strict';
 
-var Fs = require('fs');
-var Grpc = require('grpc');
-var hello_proto = Grpc.load(require.resolve('./hello.proto'));
+const Fs = require('fs');
+const Grpc = require('@grpc/grpc-js');
+const GrpcProtoLoader = require('@grpc/proto-loader');
+const hello_proto = Grpc.loadPackageDefinition(GrpcProtoLoader.loadSync(require.resolve('./hello.proto')));
 
 var lastServer;
 /**
@@ -26,29 +27,43 @@ function sayHello(call, callback) {
  * Starts an RPC server that receives requests for the Greeter service at the
  * sample server port
  */
-module.exports.start = function start(port) {
-    var server = new Grpc.Server();
-    console.log('listening on port:', port);
-    server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
+module.exports.start = async function start(port) {
+    const server = new Grpc.Server();
+    await new Promise((resolve, reject) => server.bindAsync('localhost:' + port, Grpc.ServerCredentials.createInsecure(), (err, port) => {
+        if (err) {
+            reject(err);
+            return;
+        }
+        resolve({});
+    }));
     server.addService(hello_proto.Hello.service, {sayHello: sayHello});
     server.start();
     lastServer = server;
     return server;
 };
 
-module.exports.startSsl = function start(port) {
+module.exports.startSsl = async function start(port) {
     var server = new Grpc.Server();
     console.log('listening on port:', port);
-    server.bind('localhost:' + port, Grpc.ServerCredentials.createSsl(
+    const secOptions = Grpc.ServerCredentials.createSsl(
         Fs.readFileSync(require.resolve('./certs/ca.crt')),
         [{
             private_key: Fs.readFileSync(require.resolve('./certs/server.key')),
             cert_chain: Fs.readFileSync(require.resolve('./certs/server.crt'))
         }],
         false
-    ));
+    );
+
     server.addService(hello_proto.Hello.service, {sayHello: sayHello});
-    server.start();
+    await new Promise((resolve, reject) => server.bindAsync('localhost:' + port, secOptions, (err, port) => {
+        if (err) {
+            reject(err);
+            return;
+        }
+        server.start();
+        resolve({});
+    }));
+
     return server;
 };
 

@@ -1,7 +1,7 @@
 'use strict';
 
-var Grpc = require('grpc');
-var hello_proto = Grpc.load(require.resolve('./hello.proto'));
+var Grpc = require('@grpc/grpc-js');
+var hello_proto = Grpc.loadPackageDefinition(GrpcProtoLoader.loadSync(require.resolve('./hello.proto')));
 
 /**
  * Implements stream/stream call
@@ -25,10 +25,16 @@ function sayHelloAll(call) {
  * Starts an RPC server that receives requests for the Greeter service at the
  * sample server port
  */
-module.exports.start = function start(port) {
+module.exports.start = async function start(port) {
     var server = new Grpc.Server();
     console.log('listening on port:', port);
-    server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
+    await new Promise((resolve, reject) => server.bindAsync('localhost:' + port, Grpc.ServerCredentials.createInsecure(), (err, port) => {
+        if (err) {
+            reject(err);
+            return;
+        }
+        resolve({});
+    }));    
     server.addService(hello_proto.Hello.service, {
         sayHelloAll: sayHelloAll
     });

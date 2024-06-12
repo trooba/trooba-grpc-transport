@@ -7,9 +7,9 @@ process.on('SIGINT', close);
 
 var server = Server.startSsl(6565);
 
-function close() {
+async function close() {
     console.log('closing ...');
-    server.tryShutdown(function() {
+    (await server).tryShutdown(function() {
         console.log('done');
     });
 }

@@ -1,10 +1,12 @@
 'use strict';
 
 const NodeUtils = require('util');
-const Grpc = require('grpc');
+const Grpc = require('@grpc/grpc-js');
 const Hoek = require('hoek');
 const _ = require('lodash');
 const streaming = require('trooba-streaming');
+const GrpcProtoLoader = require('@grpc/proto-loader');
+
 
 const TroobaReadableStream = streaming.TroobaReadableStream;
 const TroobaWritableStream = streaming.TroobaWritableStream;
@@ -23,7 +25,7 @@ module.exports = function grpcTransport(pipe, config) {
     debug('# grpc init');
 
     const proto = config.proto = typeof config.proto === 'string' ?
-        Grpc.load(config.proto) : config.proto;
+        Grpc.loadPackageDefinition(GrpcProtoLoader.loadSync(config.proto)) : config.proto;
     let endpoint = config.hostname + ':' + config.port;
 
     pipe.set('client:default', clientApi);
@@ -62,8 +64,9 @@ module.exports = function grpcTransport(pipe, config) {
         const waitForClientReady = process.domain ?
             process.domain.bind(waitForConnect) : waitForConnect;
 
+        const deadline = Date.now() + (config.connectTimeout || 1000);
         Grpc.waitForClientReady(config.$client,
-            Date.now() + (config.connectTimeout || 1000),
+            deadline,
             waitForClientReady);
 
         function waitForConnect(err) {
@@ -119,12 +122,18 @@ module.exports = function grpcTransport(pipe, config) {
 
             if (err) {
                 err.code = 'ETIMEDOUT';
+                        const credentials = config.credentials || Grpc.credentials.createInsecure();
+
+                // config.$client = new proto[config.serviceName](endpoint, credentials, config.options);
+                // config.$client.healthCheck()
                 debug('# got error while connecting', endpoint, err);
                 return timedReply(err);
             }
 
             debug('# calling', pipe.context.operation);
+
             const call = config.$client[pipe.context.operation].apply(config.$client, args);
+            console.log('-----------call', pipe.context.operation, args, call)
 
             call.on('status', function onStatus(status) {
                 responseStatus = responseStatus || {};
@@ -147,7 +156,7 @@ module.exports = function grpcTransport(pipe, config) {
                 pipe.on('request:data', onRequestData);
 
                 call.once('error', err => {
-                    // FIX SIGSEGV (Address boundary error) due to diconnect connection
+                    // FIX SIGSEGV (Address boundary error) due to disconnect connection
                     // to prevent writing
                     pipe.removeListener('request:data', onRequestData);
                 });
@@ -228,39 +237,44 @@ module.exports = function grpcTransport(pipe, config) {
         const credentials = config.serverCredentials || Grpc.ServerCredentials.createInsecure();
 
         const server = new Grpc.Server();
-        config.port = server.bind(endpoint, credentials);
-        endpoint = config.hostname + ':' + config.port;
-
-        const services = selectServices(proto);
-        pipe.context.service$ = true;
-        const genericRequest = createGenericHandler(pipe);
-
-        Object.keys(services).forEach(serviceName => {
-            const methods = services[serviceName];
-
-            let routes = methods.reduce((memo, methodMeta) => {
-                methodMeta.service = serviceName;
-                memo[methodMeta.name] = request$.bind(memo, methodMeta);
-                return memo;
-            }, {});
-
-            debug('# service %s routes:', serviceName, routes);
-            server.addService(_.get(proto, serviceName).service, routes);
-        });
-
-        return {
-            listen: (callback) => {
-                if (endpoint && endpoints[endpoint]) {
-                    let err = new Error('The service is already running:' + endpoint);
-                    if (callback) {
-                        return callback(err);
-                    }
-                    throw err;
+        const pendingServer = new Promise((resolve, reject) => {
+            server.bindAsync(endpoint, credentials, (err, port) => {
+                if (err) {
+                    reject(err);
+                    return;
                 }
-                endpoints[endpoint] = server;
 
+                config.port = port;
+                endpoint = config.hostname + ':' + config.port;
+
+                const services = selectServices(proto);
+                pipe.context.service$ = true;
+                const genericHandler = createGenericHandler(pipe);
+                const request$ = createRequestHandler(genericHandler);
+
+                Object.keys(services).forEach(serviceName => {
+                    const methods = services[serviceName];
+
+                    let routes = methods.reduce((memo, methodMeta) => {
+                        methodMeta.service = serviceName;
+                        memo[methodMeta.name] = request$.bind(memo, methodMeta);
+                        return memo;
+                    }, {});
+
+                    debug('# service %s routes:', serviceName, routes);
+                    server.addService(_.get(proto, serviceName).service, routes);
+                });
+
+                endpoints[endpoint] = server;
                 server.start();
-                callback && setImmediate(callback);
+                resolve({});                
+            });
+        });
+        
+        return {
+            listen: async () => {
+                await pendingServer;
+
                 return {
                     port: config.port,
                     close: (cb, timeout) => {
@@ -279,56 +293,58 @@ module.exports = function grpcTransport(pipe, config) {
             }
         };
 
-        function request$(operation, call, callback) {
+        function createRequestHandler(genericHandler) {
+            return function request$(operation, call, callback) {
+                debug('# request$ for', operation.name, call.request, call.metadata.getMap())
+                const session = genericHandler(operation,
+                    call.request, call.metadata.getMap());
 
-            const session = genericRequest(operation,
-                call.request, call.metadata.getMap());
-
-            if (operation.responseStream) {
-                session.pipe(call);
-            }
-            else {
-                session
-                .on('error', err => {
-                    return callback(err);
-                })
-                .on('response', (response) => {
-                    sendMetadata(response.headers);
-                    callback(null, {
-                        message: response.body
-                    });
-                });
-            }
-
-            if (operation.requestStream) {
-                call.pipe(session);
-            }
-
-            if (operation.responseStream) {
-                session.once('response', function onResponse(response) {
-                    response && response.headers && sendMetadata(response.headers);
-                });
-                return new TroobaReadableStream(pipe);
-            }
-
-            function sendMetadata(headers) {
-                if (headers) {
-                    const keys = Object.keys(headers);
-                    if (keys.length) {
-                        const meta = new Grpc.Metadata();
-                        keys.forEach(name => {
-                            meta.set(name, headers[name]);
+                if (operation.responseStream) {
+                    session.pipe(call);
+                }
+                else {
+                    session
+                        .on('error', err => {
+                            return callback(err);
+                        })
+                        .on('response', (response) => {
+                            sendMetadata(response.headers);
+                            callback(null, {
+                                message: response.body
+                            });
                         });
-                        call.sendMetadata(meta);
+                }
+
+                if (operation.requestStream) {
+                    call.pipe(session);
+                }
+
+                if (operation.responseStream) {
+                    session.once('response', function onResponse(response) {
+                        response && response.headers && sendMetadata(response.headers);
+                    });
+                    return new TroobaReadableStream(pipe);
+                }
+
+                function sendMetadata(headers) {
+                    if (headers) {
+                        const keys = Object.keys(headers);
+                        if (keys.length) {
+                            const meta = new Grpc.Metadata();
+                            keys.forEach(name => {
+                                meta.set(name, headers[name]);
+                            });
+                            call.sendMetadata(meta);
+                        }
                     }
                 }
+
             }
-
         }
-
     }
 
     function clientApi(pipe) {
+        console.trace('=============CLIENT')
         const credentials = config.credentials || Grpc.credentials.createInsecure();
         pipe.context.client$ = true;
 
@@ -359,7 +375,6 @@ module.exports = function grpcTransport(pipe, config) {
 
     function createGenericHandler(pipeline) {
         return function genericRequest(operation, message, metadata, callback) {
-
             const args = [].slice.call(arguments);
             operation = args.shift();
             callback = operation.responseStream ? undefined : args.pop();
@@ -369,6 +384,7 @@ module.exports = function grpcTransport(pipe, config) {
                 metadata = callback;
                 callback = undefined;
             }
+            console.trace('# pipe for', operation.name, message);
             debug('# pipe for', operation.name, message);
 
             const requestMethod = operation.requestStream ? 'streamRequest' : 'request';
@@ -382,6 +398,7 @@ module.exports = function grpcTransport(pipe, config) {
             var servicePath = operation.service ?
                 [operation.service.replace(/\./g, '/'), operation.name].join('/') :
                 operation.name;
+
             pipe = pipe[requestMethod]({
                 body: message,
                 headers: metadata,
@@ -411,7 +428,6 @@ module.exports = function grpcTransport(pipe, config) {
             else {
                 return pipe;
             }
-
         };
     }
 };
@@ -464,11 +480,11 @@ function selectServices(proto, base, collection) {
         const path = base.slice();
         path.push(name);
         const member = proto[name];
-        if (member.service) {
+        if (member?.service) {
             const serviceName = path.join('.');
             collection[serviceName] = selectMethods(member);
         }
-        else if (typeof member === 'object') {
+        else if (member && typeof member === 'object') {
             selectServices(member, path, collection);
         }
     });

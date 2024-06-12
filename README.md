@@ -77,7 +77,7 @@ message HelloReply {
 var pipeServer = Trooba.use(transport, {
     port: port,
     hostname: 'localhost',
-    proto: Grpc.load(require.resolve('./path/to/hello.proto'))
+    proto: Grpc.loadPackageDefinition(GrpcProtoLoader.loadSync(require.resolve('./path/to/hello.proto')))
 })
 .use(function handler(pipe) {
     pipe.on('request', (request, next) => {
