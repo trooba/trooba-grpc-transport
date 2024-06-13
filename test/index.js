@@ -231,7 +231,7 @@ describe(__filename, function () {
         let messageCount = 0;
 
         await new Promise((resolve, reject) => {
-            const call = client.beGreeted('Jack');
+            const call = client.beGreeted({ name: 'Jack'});
             call.on('data', function (data) {
                 messageCount++;
                 try {
@@ -254,7 +254,7 @@ describe(__filename, function () {
                     reject(err);
                 }
             })
-            .on('error', reject);            
+            .on('error', reject);
         });
     });
 
@@ -389,7 +389,7 @@ describe(__filename, function () {
                         reject(err);
                     }
                 });
-            });            
+            });
         });
     });
 
@@ -1002,7 +1002,7 @@ describe(__filename, function () {
                 .on('data', function () {
                     reject(new Error('Should never happen'));
                 });
-            });           
+            });
         });
 
         it('should handle timeout error in response stream flow after first chunk', async () => {
@@ -1028,7 +1028,7 @@ describe(__filename, function () {
                 .on('data', function (data) {
                     counter++;
                     try {
-                        Assert.equal('Hello timeout-after-first-chunk from Bob', data);                        
+                        Assert.equal('Hello timeout-after-first-chunk from Bob', data);
                     }
                     catch (err) {
                         reject(err);
@@ -1240,7 +1240,7 @@ describe(__filename, function () {
                     catch (err) {
                         reject(err);
                     }
-                });                
+                });
             });
         });
 
@@ -1251,13 +1251,13 @@ describe(__filename, function () {
             server = await Server.start(port);
 
             const client = Trooba
-            .use(grpcTransport, {
-                port: port,
-                hostname: 'localhost',
-                proto: Server.proto,
-                serviceName: 'Hello',
-                connectTimeout: 100
-            }).build().create('client:default');
+                .use(grpcTransport, {
+                    port: port,
+                    hostname: 'localhost',
+                    proto: Server.proto,
+                    serviceName: 'Hello',
+                    connectTimeout: 100
+                }).build().create('client:default');
 
             let messageCount = 0;
 
@@ -1269,7 +1269,7 @@ describe(__filename, function () {
                         Assert.ok([
                             'Hello John',
                             'Hello Bob'
-                        ].indexOf(data) !== -1);                        
+                        ].indexOf(data) !== -1);
                     }
                     catch (err) {
                         reject(err);
@@ -1297,7 +1297,7 @@ describe(__filename, function () {
                         });
                         call.end();
                     }, 500);
-                }, 500);                
+                }, 500);
             });
         });
 
@@ -1520,7 +1520,7 @@ describe(__filename, function () {
                     }
                 })
                 .on('error', reject);
-            }, 1000);            
+            }, 1000);
         });
     });
 
