@@ -172,7 +172,7 @@ describe(__filename, () => {
         const client = pipeClient.build().create('client:default');
 
         return new Promise((resolve, reject) => {
-            client.sayHello('John', function (err, response) {
+            client.sayHello({name:  'John'}, function (err, response) {
                 try {
                     Assert.ok(!err, err && err.stack);
                     Assert.equal('Hello John', response);
@@ -292,8 +292,8 @@ describe(__filename, () => {
                 }
             });
 
-            call.write('John');
-            call.write('Bob');
+            call.write({name: 'John'});
+            call.write({name: 'Bob'});
             call.end();
         });
     });

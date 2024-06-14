@@ -219,7 +219,7 @@ describe(__filename, function () {
         const Server = require('./fixtures/hello-streaming/server');
 
         const port = portCounter++;
-        server = Server.start(port);
+        server = await Server.start(port);
 
         const client = Trooba.use(grpcTransport, {
             port: port,
@@ -1430,7 +1430,7 @@ describe(__filename, function () {
                 for (var i = index; i < MAX; i++) {
                     var name = 'John' + i;
                     names.push(name);
-                    if (!call.write(name)) {
+                    if (!call.write({name: name})) {
                         paused = true;
                         call.on('drain', drain);
                         return;
@@ -1451,7 +1451,7 @@ describe(__filename, function () {
 
     // gRPC does not seem to re-try anymore, starting around 1.3.x version
     // the workaround is to use re-try handler in trooba in case of timeout
-    it.skip('should handle write pause at transport side, request stream', async () => {
+    it('should handle write pause at transport side, request stream', async () => {
         var Server = require('./fixtures/hello-streaming/server');
 
         var port = portCounter++;
@@ -1471,8 +1471,8 @@ describe(__filename, function () {
             done();
         });
 
-        call.write('John');
-        call.write('Bob');
+        call.write({name: 'John'});
+        call.write({name: 'Bob'});
         call.end();
 
         setTimeout(function () {
@@ -1497,7 +1497,7 @@ describe(__filename, function () {
         let messageCount = 0;
 
         return new Promise((resolve, reject) => {
-            const call = client.beGreeted('massive');
+            const call = client.beGreeted({name: 'massive'});
             setTimeout(function () {
                 call
                 .on('data', function (data) {
@@ -1614,8 +1614,8 @@ describe(__filename, function () {
                         }
                     });
 
-                    call.write('John' + index);
-                    call.write('Bob' + index);
+                    call.write({name: 'John' + index});
+                    call.write({name: 'Bob' + index});
                     call.end();
                 }
             });
@@ -1674,8 +1674,8 @@ describe(__filename, function () {
                     });
 
                     // sending request
-                    call.write('John' + index);
-                    call.write('Bob' + index);
+                    call.write({name: 'John' + index});
+                    call.write({name: 'Bob' + index});
                     call.end();
                 }
             });
