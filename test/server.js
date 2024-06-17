@@ -23,7 +23,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(routes());
+            .use(routes());
 
         const app = pipeServer.build().create('server:default');
 
@@ -62,7 +62,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(routes());
+            .use(routes());
 
         const app = pipeServer.build().create('server:default');
 
@@ -101,7 +101,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(routes());
+            .use(routes());
 
         const app = pipeServer.build().create('server:default');
 
@@ -110,18 +110,18 @@ describe(__filename, () => {
 
         let meta;
         const pipeClient = Trooba
-        .use(function catchHeaders(pipe) {
-            pipe.on('response', function (response, next) {
-                meta = response.headers;
-                next();
+            .use(function catchHeaders(pipe) {
+                pipe.on('response', function (response, next) {
+                    meta = response.headers;
+                    next();
+                });
+            })
+            .use(transport, {
+                port: svr.port,
+                hostname: 'localhost',
+                proto: Server.proto,
+                serviceName: 'Hello'
             });
-        })
-        .use(transport, {
-            port: svr.port,
-            hostname: 'localhost',
-            proto: Server.proto,
-            serviceName: 'Hello'
-        });
         const client = pipeClient.build().create('client:default');
 
         return new Promise((resolve, reject) => {
@@ -134,6 +134,8 @@ describe(__filename, () => {
                 try {
                     Assert.ok(!err);
                     Assert.deepEqual({
+                        'content-type': 'application/grpc+proto',
+                        date: new Date(Date.now()).toUTCString(),
                         qaz: 'edc',
                         foo: 'bar'
                     }, meta);
@@ -154,7 +156,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(routes());
+            .use(routes());
 
         const app = pipeServer.build().create('server:default');
 
@@ -170,7 +172,7 @@ describe(__filename, () => {
         const client = pipeClient.build().create('client:default');
 
         return new Promise((resolve, reject) => {
-            client.sayHello('John', function (err, response) {
+            client.sayHello({name:  'John'}, function (err, response) {
                 try {
                     Assert.ok(!err, err && err.stack);
                     Assert.equal('Hello John', response);
@@ -191,7 +193,7 @@ describe(__filename, () => {
             hostname: 'localhost',
             proto: Server.proto
         })
-        .use(routes());
+            .use(routes());
 
         const app = pipeServer.build().create('server:default');
 
@@ -210,29 +212,29 @@ describe(__filename, () => {
         return new Promise((resolve, reject) => {
             const call = client.beGreeted('Jack');
             call
-            .on('data', function (data) {
-                messageCount++;
-                try {
-                    Assert.ok([
-                        'Hello Jack from John',
-                        'Hello Jack from Bob'
-                    ].indexOf(data) !== -1);
-                }
-                catch (err) {
-                    reject(err);
-                }
-            })
-            .on('end', function () {
-                // reached the end
-                try {
-                    Assert.equal(2, messageCount);
-                    done();
-                }
-                catch (err) {
-                    reject(err);
-                }
-            })
-            .on('error', reject);
+                .on('data', function (data) {
+                    messageCount++;
+                    try {
+                        Assert.ok([
+                            'Hello Jack from John',
+                            'Hello Jack from Bob'
+                        ].indexOf(data) !== -1);
+                    }
+                    catch (err) {
+                        reject(err);
+                    }
+                })
+                .on('end', function () {
+                    // reached the end
+                    try {
+                        Assert.equal(2, messageCount);
+                        done();
+                    }
+                    catch (err) {
+                        reject(err);
+                    }
+                })
+                .on('error', reject);
         });
     });
 
@@ -240,29 +242,29 @@ describe(__filename, () => {
         const Server = require('./fixtures/hello-streaming/server');
 
         const pipeServer = Trooba
-        .use(transport, {
-            port: 0,
-            hostname: 'localhost',
-            proto: Server.proto
-        })
-        .use(function dummy(pipe) {
-            // nothing, just to have a pipeline
-        })
-        .use(function routes(pipe) {
-            const names = [];
-            pipe.on('request', function onData(request, next) {
-                next();
-            });
-            pipe.on('request:data', function onData(data, next) {
-                data && names.push(data.name);
-                next();
-            });
-            pipe.on('request:end', function onEnd() {
-                pipe.respond({
-                    body: 'Hello ' + names.join(' and ')
+            .use(transport, {
+                port: 0,
+                hostname: 'localhost',
+                proto: Server.proto
+            })
+            .use(function dummy(pipe) {
+                // nothing, just to have a pipeline
+            })
+            .use(function routes(pipe) {
+                const names = [];
+                pipe.on('request', function onData(request, next) {
+                    next();
+                });
+                pipe.on('request:data', function onData(data, next) {
+                    data && names.push(data.name);
+                    next();
+                });
+                pipe.on('request:end', function onEnd() {
+                    pipe.respond({
+                        body: 'Hello ' + names.join(' and ')
+                    });
                 });
             });
-        });
 
         const app = pipeServer.build().create('server:default');
 
@@ -290,8 +292,8 @@ describe(__filename, () => {
                 }
             });
 
-            call.write('John');
-            call.write('Bob');
+            call.write({name: 'John'});
+            call.write({name: 'Bob'});
             call.end();
         });
     });
@@ -300,15 +302,15 @@ describe(__filename, () => {
         const Server = require('./fixtures/hello-streaming/server');
 
         const pipeServer = Trooba
-        .use(transport, {
-            port: 0,
-            hostname: 'localhost',
-            proto: Server.proto
-        })
-        .use(function dummy(pipe) {
-            // nothing, just to have a pipeline
-        })
-        .use(routes());
+            .use(transport, {
+                port: 0,
+                hostname: 'localhost',
+                proto: Server.proto
+            })
+            .use(function dummy(pipe) {
+                // nothing, just to have a pipeline
+            })
+            .use(routes());
 
         const app = pipeServer.build().create('server:default');
 
@@ -348,7 +350,7 @@ describe(__filename, () => {
                     reject(err);
                 }
             })
-            .on('error', reject);
+                .on('error', reject);
 
             call.write('John');
             call.write('Bob');
@@ -359,29 +361,29 @@ describe(__filename, () => {
     it('should fail to start server twice on the same endpoint when it is already running', async () => {
         const Server = require('./fixtures/hello-streaming/server');
         const pipeServer = Trooba
-        .use(transport, {
-            port: 40000,
-            hostname: 'localhost',
-            proto: Server.proto
-        })
-        .use(function dummy(pipe) {
-            // nothing, just to have a pipeline
-        })
-        .use(routes());
+            .use(transport, {
+                port: 40000,
+                hostname: 'localhost',
+                proto: Server.proto
+            })
+            .use(function dummy(pipe) {
+                // nothing, just to have a pipeline
+            })
+            .use(routes());
 
         const app = pipeServer.build().create('server:default');
         svr = await app.listen();
 
         const app2 = Trooba
-        .use(transport, {
-            port: 40000,
-            hostname: 'localhost',
-            proto: Server.proto
-        })
-        .use(function dummy(pipe) {
-            // nothing, just to have a pipeline
-        })
-        .use(routes()).build().create('server:default');
+            .use(transport, {
+                port: 40000,
+                hostname: 'localhost',
+                proto: Server.proto
+            })
+            .use(function dummy(pipe) {
+                // nothing, just to have a pipeline
+            })
+            .use(routes()).build().create('server:default');
 
         await new Promise(resolve => setTimeout(resolve, 1000));
         const err = (await app2.listen().catch(err => err));
@@ -391,12 +393,12 @@ describe(__filename, () => {
     it('should force shutdown', async () =>  {
         const Server = require('./fixtures/hello-streaming/server');
         const pipeServer = Trooba
-        .use(transport, {
-            port: 40000,
-            hostname: 'localhost',
-            proto: Server.proto
-        })
-        .use(routes());
+            .use(transport, {
+                port: 40000,
+                hostname: 'localhost',
+                proto: Server.proto
+            })
+            .use(routes());
 
         const app = pipeServer.build().create('server:default');
 
