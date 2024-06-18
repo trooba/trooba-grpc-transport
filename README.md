@@ -42,8 +42,11 @@ require('trooba')
         connectTimeout: 100,
         socketTimeout: 1000
     })
-    .build('client:default')
-    .hello('Bob', function (err, response) {
+    .build()
+    .create('client:default')
+    .hello({
+        name: 'Bob'
+    }, function (err, response) {
         console.log(err, response)
     });
 ```
@@ -77,7 +80,7 @@ message HelloReply {
 var pipeServer = Trooba.use(transport, {
     port: port,
     hostname: 'localhost',
-    proto: Grpc.load(require.resolve('./path/to/hello.proto'))
+    proto: Grpc.loadPackageDefinition(GrpcProtoLoader.loadSync(require.resolve('./path/to/hello.proto')))
 })
 .use(function handler(pipe) {
     pipe.on('request', (request, next) => {
@@ -121,7 +124,7 @@ var pipeServer = Trooba.use(transport, {
     });
 });
 
-var app = pipeServer.build('server:default');
+const app = pipeServer.build('server:default');
 
 svr = app.listen();
 console.log('toorba service is listening on port:', port);

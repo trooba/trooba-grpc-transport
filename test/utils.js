@@ -12,7 +12,7 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'sayHello',
+                    name: 'SayHello',
                     requestStream: false,
                     responseStream: false
                 }
@@ -24,7 +24,7 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'sayHello',
+                    name: 'SayHello',
                     requestStream: false,
                     responseStream: false
                 }
@@ -39,12 +39,12 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'sayHello',
+                    name: 'SayHello',
                     requestStream: false,
                     responseStream: false
                 },
                 {
-                    name: 'sayHi',
+                    name: 'SayHi',
                     requestStream: false,
                     responseStream: false
                 }
@@ -56,12 +56,12 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'sayHello',
+                    name: 'SayHello',
                     requestStream: false,
                     responseStream: false
                 },
                 {
-                    name: 'sayHi',
+                    name: 'SayHi',
                     requestStream: false,
                     responseStream: false
                 }
@@ -74,7 +74,7 @@ describe(__filename, function () {
 
         Assert.throws(function () {
             Utils.extractService(proto);
-        }, /Service name should be provided in multi-service proto: {[\s\n]*HelloRequest/);
+        }, /Service name should be provided in multi-service proto: {[\s\n]*Hello/);
 
         Assert.throws(function () {
             Utils.extractService(proto, 'doesNotExists');
@@ -84,7 +84,7 @@ describe(__filename, function () {
         Assert.deepEqual({
             name: 'Hello',
             methods: [{
-                name: 'sayHello',
+                name: 'SayHello',
                 requestStream: false,
                 responseStream: false
             }]
@@ -94,7 +94,7 @@ describe(__filename, function () {
         Assert.deepEqual({
             name: 'Hi',
             methods: [{
-                name: 'sayHi',
+                name: 'SayHi',
                 requestStream: false,
                 responseStream: false
             }]
@@ -108,17 +108,17 @@ describe(__filename, function () {
             name: 'Hello',
             methods: [
                 {
-                    name: 'sayHello',
+                    name: 'SayHello',
                     requestStream: true,
                     responseStream: false
                 },
                 {
-                    name: 'beGreeted',
+                    name: 'BeGreeted',
                     requestStream: false,
                     responseStream: true
                 },
                 {
-                    name: 'sayHelloAll',
+                    name: 'SayHelloAll',
                     requestStream: true,
                     responseStream: true
                 },

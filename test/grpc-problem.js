@@ -1,12 +1,12 @@
 'use strict';
 
-const Grpc = require('grpc');
+const Grpc = require('@grpc/grpc-js');
 
 // Validate with next version of grpc
 describe.skip('terminated by signal SIGSEGV (Address boundary error)', () => {
-    it('will fail with "signal SIGSEGV (Address boundary error)"', next => {
+    it('will fail with "signal SIGSEGV (Address boundary error)"', async () => {
         const Server = require('./fixtures/grpc-problem/server');
-        const server = Server.start(50000);
+        const server = await Server.start(50000);
         const client = new Server.proto.Hello('localhost:50000', Grpc.credentials.createInsecure());
 
         var call = client.sayHelloAll();

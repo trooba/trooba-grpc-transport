@@ -1,7 +1,8 @@
 'use strict';
 
-var Grpc = require('grpc');
-var hello_proto = Grpc.load(require.resolve('./hello.proto'));
+const Grpc = require('@grpc/grpc-js');
+const GrpcProtoLoader = require('@grpc/proto-loader');
+const hello_proto = Grpc.loadPackageDefinition(GrpcProtoLoader.loadSync(require.resolve('./hello.proto')));
 
 /**
  * Implements stream/response call
@@ -19,7 +20,9 @@ function sayHello(call, callback) {
         names.push(message.name);
     });
     call.on('end', function onEnd() {
-        callback(null, {message: 'Hello ' + names.join(' and ')});
+        callback(null, {
+            message: 'Hello ' + names.join(' and ')
+        });
     });
 }
 
@@ -35,7 +38,9 @@ function beGreeted(call) {
 
     if (call.request.name === 'massive') {
         for (var j = 0; j < 1000; j++) {
-            call.write(reply + ' from John' + j);
+            call.write({
+                message: reply + ' from John' + j
+            });
         }
         call.end();
         return;
@@ -51,10 +56,14 @@ function beGreeted(call) {
             return;
         }
         if (call.request.name === 'slow') {
-            setTimeout(call.write.bind(call, reply + ' from ' + array[i]), 100 * (i + 1));
+            setTimeout(call.write.bind(call, {
+                message: reply + ' from ' + array[i]
+            }), 100 * (i + 1));
         }
         else {
-            call.write(reply + ' from ' + array[i]);
+            call.write({
+                message: reply + ' from ' + array[i]
+            });
         }
     }
     if (call.request.name === 'no-end') {
@@ -80,7 +89,9 @@ function sayHelloAll(call) {
     call.sendMetadata(meta);
 
     call.on('data', function onData(message) {
-        call.write('Hello ' + message.name);
+        call.write({
+            message: 'Hello ' + message.name
+        });
     });
     call.on('end', function () {
         call.end();
@@ -90,16 +101,23 @@ function sayHelloAll(call) {
  * Starts an RPC server that receives requests for the Greeter service at the
  * sample server port
  */
-module.exports.start = function start(port) {
-    var server = new Grpc.Server();
-    console.log('listening on port:', port);
-    server.bind('localhost:' + port, Grpc.ServerCredentials.createInsecure());
+module.exports.start = async function start(port) {
+    const server = new Grpc.Server();
     server.addService(hello_proto.Hello.service, {
-        sayHello: sayHello,
-        beGreeted: beGreeted,
-        sayHelloAll: sayHelloAll
+        sayHello,
+        beGreeted,
+        sayHelloAll
     });
-    server.start();
+    await new Promise((resolve, reject) => server.bindAsync('localhost:' + port, Grpc.ServerCredentials.createInsecure(), (err, port) => {
+        if (err) {
+            reject(err);
+            return;
+        }
+        resolve({
+            port
+        });
+    }));
+    console.log('listening on port:', port);
     return server;
 };
 
