@@ -45,10 +45,10 @@ module.exports.startSsl = async function start(port) {
     var server = new Grpc.Server();
     console.log('listening on port:', port);
     const secOptions = Grpc.ServerCredentials.createSsl(
-        Fs.readFileSync(require.resolve('./certs/ca.crt')),
+        Fs.readFileSync(require.resolve('./certs/ca-cert.pem')),
         [{
-            private_key: Fs.readFileSync(require.resolve('./certs/server.key')),
-            cert_chain: Fs.readFileSync(require.resolve('./certs/server.crt'))
+            private_key: Fs.readFileSync(require.resolve('./certs/server-key.pem')),
+            cert_chain: Fs.readFileSync(require.resolve('./certs/server-cert.pem'))
         }],
         false
     );
@@ -68,7 +68,8 @@ module.exports.startSsl = async function start(port) {
 module.exports.proto = hello_proto;
 
 module.exports.clientCredentials = Grpc.credentials.createSsl(
-    Fs.readFileSync(require.resolve('./certs/server.crt')),
-    Fs.readFileSync(require.resolve('./certs/client.key')),
-    Fs.readFileSync(require.resolve('./certs/client.crt'))
+    Fs.readFileSync(require.resolve('./certs/ca-cert.pem')),
+    Fs.readFileSync(require.resolve('./certs/client-key.pem')),
+    Fs.readFileSync(require.resolve('./certs/client-cert.pem'))
+
 );
