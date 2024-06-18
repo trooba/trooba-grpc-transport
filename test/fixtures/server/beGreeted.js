@@ -9,10 +9,14 @@ module.exports = function (request, pipe) {
             return;
         }
         if (request.body.name === 'slow') {
-            setTimeout(responseStream.write.bind(responseStream, reply + ' from ' + array[i]), 100 * (i + 1));
+            setTimeout(responseStream.write.bind(responseStream, {
+                message: reply + ' from ' + array[i]
+            }), 100 * (i + 1));
         }
         else {
-            responseStream.write(reply + ' from ' + array[i]);
+            responseStream.write({
+                message: reply + ' from ' + array[i]
+            });
         }
     }
     if (request.body.name === 'no-end') {

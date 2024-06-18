@@ -133,7 +133,6 @@ module.exports = function grpcTransport(pipe, config) {
             debug('# calling', pipe.context.operation);
 
             const call = config.$client[pipe.context.operation].apply(config.$client, args);
-            console.log('-----------call', pipe.context.operation, args, call)
 
             call.on('status', function onStatus(status) {
                 responseStatus = responseStatus || {};
@@ -169,7 +168,7 @@ module.exports = function grpcTransport(pipe, config) {
                     responseStatus = undefined;
                 });
 
-                call.on('data', function onData(data) {
+                call.on('data', data => {
                     startResponseStream();
                     timedReply(null, data);
                 });
@@ -237,6 +236,26 @@ module.exports = function grpcTransport(pipe, config) {
         const credentials = config.serverCredentials || Grpc.ServerCredentials.createInsecure();
 
         const server = new Grpc.Server();
+        const services = selectServices(proto);
+        pipe.context.service$ = true;
+        const genericHandler = createGenericHandler(pipe);
+        const request$ = createRequestHandler(genericHandler);
+
+        Object.keys(services).forEach(serviceName => {
+            const methods = services[serviceName];
+
+            let routes = methods.reduce((memo, methodMeta) => {
+                methodMeta.service = serviceName;
+                memo[methodMeta.name] = request$.bind(memo, methodMeta);
+                return memo;
+            }, {});
+
+            debug('# service %s routes:', serviceName, routes);
+            const serviceOp = _.get(proto, serviceName).service;
+
+            server.addService(serviceOp, routes);
+        });
+
         const pendingServer = new Promise((resolve, reject) => {
             server.bindAsync(endpoint, credentials, (err, port) => {
                 if (err) {
@@ -246,37 +265,22 @@ module.exports = function grpcTransport(pipe, config) {
 
                 config.port = port;
                 endpoint = config.hostname + ':' + config.port;
-
-                const services = selectServices(proto);
-                pipe.context.service$ = true;
-                const genericHandler = createGenericHandler(pipe);
-                const request$ = createRequestHandler(genericHandler);
-
-                Object.keys(services).forEach(serviceName => {
-                    const methods = services[serviceName];
-
-                    let routes = methods.reduce((memo, methodMeta) => {
-                        methodMeta.service = serviceName;
-                        memo[methodMeta.name] = request$.bind(memo, methodMeta);
-                        return memo;
-                    }, {});
-
-                    debug('# service %s routes:', serviceName, routes);
-                    server.addService(_.get(proto, serviceName).service, routes);
-                });
-
                 endpoints[endpoint] = server;
-                server.start();
-                resolve({});                
+
+                resolve({
+                    port
+                });                
             });
         });
         
         return {
             listen: async () => {
-                await pendingServer;
+                const {
+                    port
+                } = await pendingServer;
 
                 return {
-                    port: config.port,
+                    port,
                     close: (cb, timeout) => {
                         const cleanup = Hoek.once(() => {
                             delete endpoints[endpoint];
@@ -344,7 +348,6 @@ module.exports = function grpcTransport(pipe, config) {
     }
 
     function clientApi(pipe) {
-        console.trace('=============CLIENT')
         const credentials = config.credentials || Grpc.credentials.createInsecure();
         pipe.context.client$ = true;
 
@@ -384,7 +387,7 @@ module.exports = function grpcTransport(pipe, config) {
                 metadata = callback;
                 callback = undefined;
             }
-            console.trace('# pipe for', operation.name, message);
+
             debug('# pipe for', operation.name, message);
 
             const requestMethod = operation.requestStream ? 'streamRequest' : 'request';

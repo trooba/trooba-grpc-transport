@@ -81,7 +81,6 @@ function beGreeted(call) {
  * Implements stream/stream call
  */
 function sayHelloAll(call) {
-    console.log('--------------BOOM')
     var meta = new Grpc.Metadata();
     meta.set('foo', 'bar');
     if (call.metadata.getMap().qaz) {
@@ -104,20 +103,21 @@ function sayHelloAll(call) {
  */
 module.exports.start = async function start(port) {
     const server = new Grpc.Server();
-    console.log('listening on port:', port);
-    await new Promise((resolve, reject) => server.bindAsync('localhost:' + port, Grpc.ServerCredentials.createInsecure(), (err, port) => {
-        if (err) {
-            reject(err);
-            return;
-        }
-        server.start();
-        resolve({});
-    }));
     server.addService(hello_proto.Hello.service, {
         sayHello,
         beGreeted,
         sayHelloAll
     });
+    await new Promise((resolve, reject) => server.bindAsync('localhost:' + port, Grpc.ServerCredentials.createInsecure(), (err, port) => {
+        if (err) {
+            reject(err);
+            return;
+        }
+        resolve({
+            port
+        });
+    }));
+    console.log('listening on port:', port);
     return server;
 };
 

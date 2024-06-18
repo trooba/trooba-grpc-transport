@@ -19,7 +19,7 @@ function sayHello(call, callback) {
  */
 module.exports.start = async function start(port) {
     const server = new Grpc.Server();
-    console.log('listening on port:', port);
+    server.addService(hello_proto.com.xyz.helloworld.Hello.service, { sayHello: sayHello });
     await new Promise((resolve, reject) => server.bindAsync('localhost:' + port, Grpc.ServerCredentials.createInsecure(), (err, port) => {
         if (err) {
             reject(err);
@@ -27,8 +27,7 @@ module.exports.start = async function start(port) {
         }
         resolve({});
     }));
-    server.addService(hello_proto.com.xyz.helloworld.Hello.service, {sayHello: sayHello});
-    server.start();
+    console.log('listening on port:', port);
     return server;
 };
 

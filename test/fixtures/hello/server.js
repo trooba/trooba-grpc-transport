@@ -29,6 +29,7 @@ function sayHello(call, callback) {
  */
 module.exports.start = async function start(port) {
     const server = new Grpc.Server();
+    server.addService(hello_proto.Hello.service, { sayHello: sayHello });
     await new Promise((resolve, reject) => server.bindAsync('localhost:' + port, Grpc.ServerCredentials.createInsecure(), (err, port) => {
         if (err) {
             reject(err);
@@ -36,8 +37,6 @@ module.exports.start = async function start(port) {
         }
         resolve({});
     }));
-    server.addService(hello_proto.Hello.service, {sayHello: sayHello});
-    server.start();
     lastServer = server;
     return server;
 };
@@ -60,7 +59,6 @@ module.exports.startSsl = async function start(port) {
             reject(err);
             return;
         }
-        server.start();
         resolve({});
     }));
 
@@ -74,14 +72,3 @@ module.exports.clientCredentials = Grpc.credentials.createSsl(
     Fs.readFileSync(require.resolve('./certs/client.key')),
     Fs.readFileSync(require.resolve('./certs/client.crt'))
 );
-
-// module.exports.clientRaptorCredentials = Grpc.credentials.createSsl(
-//     Fs.readFileSync(require.resolve('./certs/provide real pem')),
-//     Fs.readFileSync(require.resolve('./certs/client.key')),
-//     Fs.readFileSync(require.resolve('./certs/client.crt'))
-// );
-
-// module.exports.clientCredentials = Grpc.credentials.createSsl(
-//     Fs.readFileSync(require.resolve('./certs/grpc-client.key')),
-//     Fs.readFileSync(require.resolve('./certs/grpc-client.pem'))
-// );

@@ -210,7 +210,10 @@ describe(__filename, () => {
 
         let messageCount = 0;
         return new Promise((resolve, reject) => {
-            const call = client.beGreeted('Jack');
+            const call = client.beGreeted({
+                name: 'Jack'
+            });
+
             call
                 .on('data', function (data) {
                     messageCount++;
@@ -228,7 +231,7 @@ describe(__filename, () => {
                     // reached the end
                     try {
                         Assert.equal(2, messageCount);
-                        done();
+                        resolve();
                     }
                     catch (err) {
                         reject(err);
@@ -336,7 +339,7 @@ describe(__filename, () => {
                     Assert.ok([
                         'Hello John',
                         'Hello Bob'
-                    ].indexOf(data) !== -1);
+                    ].indexOf(data) !== -1, `Actual: ${data}`);
                 }
                 catch (err) {
                     reject(err);
@@ -352,8 +355,12 @@ describe(__filename, () => {
             })
                 .on('error', reject);
 
-            call.write('John');
-            call.write('Bob');
+            call.write({
+                name: 'John'
+            });
+            call.write({
+                name: 'Bob'
+            });
             call.end();
         });
     });
