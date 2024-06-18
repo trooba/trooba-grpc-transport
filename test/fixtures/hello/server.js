@@ -20,7 +20,9 @@ function sayHello(call, callback) {
         meta.set('rfv', call.metadata.getMap().qaz);
     }
     // call.sendMetadata(meta);  // <<< this fails in linux/ubuntu
-    callback(null, {message: 'Hello ' + call.request.name}, meta);
+    callback(null, {
+        message: 'Hello ' + call.request.name
+    }, meta);
 }
 
 /**

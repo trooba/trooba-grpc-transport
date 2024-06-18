@@ -1547,8 +1547,8 @@ describe(__filename, function () {
                 serviceName: 'Hello'
             }).build().create('client:default');
 
+            let count = 0;
             return new Promise((resolve, reject) => {
-                let count = 0;
                 Async.times(MAX, function (n, next) {
                     sayHello(n, next);
                 }, function (err) {
@@ -1564,11 +1564,16 @@ describe(__filename, function () {
             });
 
             function sayHello(index, next) {
-                client.sayHello('' + index, function (err, response) {
-                    Assert.ok(!err, err && err.stack);
-                    Assert.equal('Hello ' + index, response);
-                    count++;
-                    next();
+                client.sayHello({ name: '' + index }, function (err, response) {
+                    try {
+                        Assert.ok(!err, err && err.stack);
+                        Assert.equal('Hello ' + index, response);
+                        count++;
+                        next();
+                    }
+                    catch(err) {
+                        next(err);
+                    }
                 });
             }
         });
